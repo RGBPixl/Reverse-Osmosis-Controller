@@ -1,4 +1,4 @@
 .pio
 .vscode
 src/debugging.cpp
-src/secrets.h
+
