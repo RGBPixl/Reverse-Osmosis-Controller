@@ -1,12 +1,12 @@
 // FastLED Warnung ignorieren
 #define FASTLED_INTERNAL
 
-#include "state.h"
 #include "menu/entry.h"
-#include "menu/page.h"
 #include "menu/manager.h"
+#include "menu/page.h"
 #include "relais.h"
 #include "secrets.h"
+#include "state.h"
 #include <Arduino.h>
 #include <DallasTemperature.h>
 #include <FastLED.h>
@@ -15,8 +15,8 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <Wire.h>
-#include <time.h>
 #include <math.h>
+#include <time.h>
 
 #define ONE_WIRE_BUS 4
 #define LED_PIN 23
@@ -36,19 +36,17 @@ Relais relais_4(25);
 Relais relais_5(33);
 Relais relais_6(32);
 
-
-MenuEntry mainMenu({pageTemp, pageFlow, pageSensor, pageFunction, pageRelayStatus, pageTest});
+MenuEntry mainMenu({pageTemp, pageFlow, pageSensor, pageFunction,
+                    pageRelayStatus, pageTest});
 MenuEntry tempMenu({pageTemp1, pageTemp2});
 MenuEntry flowMenu({pageWaterTotal, pageSensorStatus});
 MenuEntry sensorMenu({pageOverflowSensor, pageSensor5, pageSensor6});
 MenuEntry functionMenu({pageDisinfection, pageFlushMembrane, pageFlushSystem,
-                   pageFillContainer, pageFactoryReset});
+                        pageFillContainer, pageFactoryReset});
 MenuEntry relayMenu({pageRelay1, pageRelay2, pageRelay3, pageRelay4, pageRelay5,
-                pageRelay6});
+                     pageRelay6});
 MenuEntry testMenu({pageLedRingTest});
 MenuEntry hiddenMenu({pageResetConfirm, pageResetSuccess});
-
-
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
@@ -59,7 +57,8 @@ CRGB leds[LED_COUNT];
 State state;
 
 MenuManager menuManager({mainMenu, tempMenu, flowMenu, sensorMenu, functionMenu,
-                         relayMenu, testMenu, hiddenMenu}, lcd, state);
+                         relayMenu, testMenu, hiddenMenu},
+                        lcd, state);
 
 void IRAM_ATTR handleButtonPressOK() { state.okPressed = true; }
 void IRAM_ATTR handleButtonPressL() { state.lPressed = true; }
