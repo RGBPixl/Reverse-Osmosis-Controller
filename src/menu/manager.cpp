@@ -2,7 +2,7 @@
 #include "entry.h"
 #include "page.h"
 #include "../state.h"
-#include <ArduinoSTL.h>
+#include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 
 class MenuManager {
