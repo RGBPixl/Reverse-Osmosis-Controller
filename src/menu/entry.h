@@ -1,5 +1,4 @@
 #include <ArduinoSTL.h>
-#include "page.h"
 
 class MenuEntry {
 private:

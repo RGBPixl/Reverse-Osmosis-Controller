@@ -1,6 +1,4 @@
 #include <ArduinoSTL.h>
-#include "entry.h"
-#include "page.h"
 
 class MenuManager {
 private:
