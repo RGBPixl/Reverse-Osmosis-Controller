@@ -1,3 +1,5 @@
+#pragma once
+#include "led.h"
 #include <Arduino.h>
 #include <Preferences.h>
 
@@ -19,7 +21,7 @@ public:
 
   int hourOfDay;
 
-  LedState curState = spinningRed;
+  LedState ledState;
 
   volatile bool okPressed = false;
   volatile bool lPressed = false;
@@ -28,14 +30,6 @@ public:
   Preferences preferences;
   int intervallFlushSystem;
   int intervallFlushMembrane;
-};
 
-enum LedState {
-  staticRed,
-  spinningRed,
-  staticRainbow,
-  staticGreen,
-  staticBlue,
-  spinningBlue,
-  spinningRainbow
+  State();
 };

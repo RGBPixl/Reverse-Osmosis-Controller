@@ -1,9 +1,11 @@
+#pragma once
 // FastLED Warnung ignorieren
 #define FASTLED_INTERNAL
 
 #include "menu/entry.h"
 #include "menu/manager.h"
 #include "menu/page.h"
+#include "led.h"
 #include "relais.h"
 #include "secrets.h"
 #include "state.h"
@@ -17,10 +19,10 @@
 #include <Wire.h>
 #include <math.h>
 #include <time.h>
+#include <algorithm>
 
 #define ONE_WIRE_BUS 4
 #define LED_PIN 23
-#define LED_COUNT 8
 #define STATUS_LED_RED 18
 #define STATUS_LED_GREEN 19
 #define STATUS_LED_BLUE 14
@@ -36,23 +38,22 @@ Relais relais_4(25);
 Relais relais_5(33);
 Relais relais_6(32);
 
-MenuEntry mainMenu({pageTemp, pageFlow, pageSensor, pageFunction,
-                    pageRelayStatus, pageTest});
-MenuEntry tempMenu({pageTemp1, pageTemp2});
-MenuEntry flowMenu({pageWaterTotal, pageSensorStatus});
-MenuEntry sensorMenu({pageOverflowSensor, pageSensor5, pageSensor6});
-MenuEntry functionMenu({pageDisinfection, pageFlushMembrane, pageFlushSystem,
-                        pageFillContainer, pageFactoryReset});
-MenuEntry relayMenu({pageRelay1, pageRelay2, pageRelay3, pageRelay4, pageRelay5,
-                     pageRelay6});
-MenuEntry testMenu({pageLedRingTest});
-MenuEntry hiddenMenu({pageResetConfirm, pageResetSuccess});
+MenuEntry mainMenu({MenuPage::temp, MenuPage::flow, MenuPage::sensor, MenuPage::function,
+                    MenuPage::relayStatus, MenuPage::test});
+MenuEntry tempMenu({MenuPage::temp1, MenuPage::temp2});
+MenuEntry flowMenu({MenuPage::waterTotal, MenuPage::sensorStatus});
+MenuEntry sensorMenu({MenuPage::overflowSensor, MenuPage::sensor5, MenuPage::sensor6});
+MenuEntry functionMenu({MenuPage::disinfection, MenuPage::flushMembrane, MenuPage::flushSystem,
+                        MenuPage::fillContainer, MenuPage::factoryReset});
+MenuEntry relayMenu({MenuPage::relay1, MenuPage::relay2, MenuPage::relay3, MenuPage::relay4, MenuPage::relay5,
+                     MenuPage::relay6});
+MenuEntry testMenu({MenuPage::ledRingTest});
+MenuEntry hiddenMenu({MenuPage::resetConfirm, MenuPage::resetSuccess});
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-CRGB leds[LED_COUNT];
 
 State state;
 
@@ -73,7 +74,6 @@ struct tm timeinfo;
 
 // Funktionsdeklarationen
 void getTime();
-void taskOne(void *);
 void taskScheduleManager(void *);
 
 void setup() {
@@ -137,7 +137,7 @@ void setup() {
   getTime();
 
   // Create Threads
-  xTaskCreate(taskOne, "taskOne", 10000, &state.curState, 1, NULL);
+  xTaskCreate(ledTask, "taskOne", 10000, &state.ledState, 1, NULL);
   xTaskCreate(taskScheduleManager, "taskScheduleManager", 10000, NULL, 1, NULL);
 
   state.shortStatus = "OK";
@@ -161,14 +161,14 @@ void loop() {
   getTime();
   state.hourOfDay = timeinfo.tm_hour;
 
-  if (state.okPressed && !menuManager.state()) {
+  if (state.okPressed && !menuManager.openState()) {
     menuManager.open();
     state.okPressed = false;
   }
 
   state.flowLiters = round((state.flowImpulseCount * 0.00052) * 100.0) / 100.0;
 
-  if (!menuManager.state()) {
+  if (!menuManager.openState()) {
     lcd.setCursor(0, 0);
     lcd.print("Status: " + state.shortStatus);
     lcd.setCursor(0, 1);
@@ -184,65 +184,6 @@ void loop() {
   state.temp2 = sensors.getTempCByIndex(1);
 
   delay(500);
-}
-
-void taskOne(void *parameter) {
-  LedState *state;
-  state = (LedState *)parameter;
-
-  while (true) {
-
-    switch (*state) {
-
-    case staticRed:
-      fill_solid(leds, LED_COUNT, CRGB::Red);
-      FastLED.show();
-      break;
-
-    case spinningRed:
-      for (int i = 0; i < LED_COUNT; i++) {
-        fadeToBlackBy(leds, LED_COUNT, 100);
-        leds[i] = CRGB::Red;
-        FastLED.show();
-        delay(100);
-      }
-      break;
-
-    case staticRainbow:
-      fill_rainbow(leds, LED_COUNT, 0, 32);
-      FastLED.show();
-      break;
-
-    case staticGreen:
-      fill_solid(leds, LED_COUNT, CRGB::Green);
-      FastLED.show();
-      break;
-
-    case staticBlue:
-      fill_solid(leds, LED_COUNT, CRGB::Blue);
-      FastLED.show();
-      break;
-
-    case spinningBlue:
-      for (int i = 0; i < LED_COUNT; i++) {
-        fadeToBlackBy(leds, LED_COUNT, 100);
-        leds[i] = CRGB::Blue;
-        FastLED.show();
-        delay(100);
-      }
-      break;
-
-    case spinningRainbow:
-      for (int i = LED_COUNT - 1; i >= 0; i--) {
-        fill_rainbow(leds, LED_COUNT, i * 32, 32);
-        FastLED.show();
-        delay(100);
-      }
-      break;
-    }
-
-    vTaskDelay(1); // Leichtes Yielding, um den Watchdog nicht zu triggern
-  }
 }
 
 void taskScheduleManager(void *parameter) {

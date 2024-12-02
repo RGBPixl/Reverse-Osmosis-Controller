@@ -2,361 +2,377 @@
 #include "entry.h"
 #include "page.h"
 #include "../state.h"
+#include "../shitty_vec.h"
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 
-class MenuManager {
-private:
-  std::vector<MenuEntry> items;
-  int currentMenu;
-  unsigned long startMillisIdle;
-  unsigned long currentMillisIdle;
-  bool open;
-  TaskHandle_t taskhandle;
-  LiquidCrystal_I2C &lcd;
-  State &state;
-
-  void display() {
+void MenuManager::display()
+{
     switch (this->getCurrentMenu().getCurrentPage()) {
+  case MenuPage::temp:
+    lcd.setCursor(0, 0);
+    lcd.print("Temperaturen");
+    lcd.setCursor(0, 1);
+    lcd.print("              ->");
+    break;
 
-    case pageTemp:
+  case MenuPage::flow:
+    lcd.setCursor(0, 0);
+    lcd.print("Durchfluss");
+    lcd.setCursor(0, 1);
+    lcd.print("              ->");
+    break;
+
+  case MenuPage::sensor:
+    lcd.setCursor(0, 0);
+    lcd.print("Sonst. Sensoren");
+    lcd.setCursor(0, 1);
+    lcd.print("              ->");
+    break;
+
+  case MenuPage::function:
+    lcd.setCursor(0, 0);
+    lcd.print("Funktionen");
+    lcd.setCursor(0, 1);
+    lcd.print("              ->");
+    break;
+
+  case MenuPage::relayStatus:
+    lcd.setCursor(0, 0);
+    lcd.print("Status Relais");
+    lcd.setCursor(0, 1);
+    lcd.print("              ->");
+    break;
+
+  case MenuPage::test:
+    lcd.setCursor(0, 0);
+    lcd.print("Test");
+    lcd.setCursor(0, 1);
+    lcd.print("              ->");
+    break;
+
+  case MenuPage::temp1:
+    lcd.setCursor(0, 0);
+    lcd.print("Vor Filter Temp");
+    lcd.setCursor(0, 1);
+    lcd.print(String(state.temp1) + " \xDF"
+                                    "C");
+    break;
+
+  case MenuPage::temp2:
+    lcd.setCursor(0, 0);
+    lcd.print("Nach Filter Temp");
+    lcd.setCursor(0, 1);
+    lcd.print(String(state.temp2) + " \xDF"
+                                    "C");
+    break;
+
+  case MenuPage::waterTotal:
+    lcd.setCursor(0, 0);
+    lcd.print("Wasser Total:");
+    lcd.setCursor(0, 1);
+    lcd.print("9999 L");
+    break;
+
+  case MenuPage::sensorStatus:
+    lcd.setCursor(0, 0);
+    lcd.print("Flow Sensor RAW:");
+    lcd.setCursor(0, 1);
+    lcd.print("23 IMP/M");
+    break;
+
+  case MenuPage::overflowSensor:
+    lcd.setCursor(0, 0);
+    lcd.print("Overflow Sensor");
+    lcd.setCursor(0, 1);
+    lcd.print("offen");
+    break;
+
+  case MenuPage::sensor5:
+    lcd.setCursor(0, 0);
+    lcd.print("Dummy Sensor 1");
+    lcd.setCursor(0, 1);
+    lcd.print("offen");
+    break;
+
+  case MenuPage::sensor6:
+    lcd.setCursor(0, 0);
+    lcd.print("Dummy Sensor 2");
+    lcd.setCursor(0, 1);
+    lcd.print("offen");
+    break;
+
+  case MenuPage::disinfection:
+    lcd.setCursor(0, 0);
+    lcd.print("Desinfektion");
+    lcd.setCursor(0, 1);
+    lcd.print("--> Starten <--");
+    break;
+
+  case MenuPage::flushMembrane:
+    lcd.setCursor(0, 0);
+    lcd.print("Membran Sp"
+              "\xF5"
+              "len");
+    lcd.setCursor(0, 1);
+    lcd.print("--> Starten <--");
+    break;
+
+  case MenuPage::flushSystem:
+    lcd.setCursor(0, 0);
+    lcd.print("System Sp"
+              "\xF5"
+              "len");
+    lcd.setCursor(0, 1);
+    lcd.print("--> Starten <--");
+    break;
+
+  case MenuPage::fillContainer:
+    lcd.setCursor(0, 0);
+    lcd.print("Kanister f"
+              "\xF5"
+              "llen");
+    lcd.setCursor(0, 1);
+    lcd.print("--> Starten <--");
+    break;
+
+  case MenuPage::relay1:
+    lcd.setCursor(0, 0);
+    lcd.print("Relais Zulauf");
+    lcd.setCursor(0, 1);
+    lcd.print("offen");
+    break;
+
+  case MenuPage::relay2:
+    lcd.setCursor(0, 0);
+    lcd.print("Relais Membran");
+    lcd.setCursor(0, 1);
+    lcd.print("offen");
+    break;
+
+  case MenuPage::relay3:
+    lcd.setCursor(0, 0);
+    lcd.print("Relais Abfluss");
+    lcd.setCursor(0, 1);
+    lcd.print("offen");
+    break;
+
+  case MenuPage::relay4:
+    lcd.setCursor(0, 0);
+    lcd.print("Relais Kanister");
+    lcd.setCursor(0, 1);
+    lcd.print("offen");
+    break;
+
+  case MenuPage::relay5:
+    lcd.setCursor(0, 0);
+    lcd.print("Dummy R5");
+    lcd.setCursor(0, 1);
+    lcd.print("offen");
+    break;
+
+  case MenuPage::relay6:
+    lcd.setCursor(0, 0);
+    lcd.print("Dummy R6");
+    lcd.setCursor(0, 1);
+    lcd.print("offen");
+    break;
+
+  case MenuPage::ledRingTest:
+    lcd.setCursor(0, 0);
+    lcd.print("Test LED Ring");
+    lcd.setCursor(0, 1);
+    lcd.print("Status: " + String(this->state.currentLedTest));
+    break;
+
+  case MenuPage::factoryReset:
+    lcd.setCursor(0, 0);
+    lcd.print("Factory Reset");
+    lcd.setCursor(0, 1);
+    lcd.print("---> RESET <---");
+    break;
+
+  case MenuPage::resetConfirm:
+    lcd.setCursor(0, 0);
+    lcd.print("RESET");
+    lcd.setCursor(0, 1);
+    lcd.print("bestaetigen");
+    break;
+
+  case MenuPage::resetSuccess:
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("RESET");
+    lcd.setCursor(0, 1);
+    lcd.print("erfolgreich...");
+    break;
+    }
+}
+
+void MenuManager::handleOk() {
+  switch (this->getCurrentMenu().getCurrentPage()) {
+  case MenuPage::ledRingTest:
+    this->state.currentLedTest++;
+    if (this->state.currentLedTest > 6)
+    {
+      this->state.currentLedTest = 0;
+    }
+    this->state.ledState = (LedState)this->state.currentLedTest;
+    break;
+  case MenuPage::fillContainer:
+    this->state.fillContainer = true;
+    break;
+  case MenuPage::flushMembrane:
+    this->state.flushMembrane = true;
+    break;
+  case MenuPage::flushSystem:
+    this->state.flushSystem = true;
+    break;
+  case MenuPage::factoryReset:
+  case MenuPage::resetConfirm:
+    this->state.currentResetState++;
+    switch (this->state.currentResetState)
+    {
+    case 0:
       lcd.setCursor(0, 0);
-      lcd.print("Temperaturen");
-      lcd.setCursor(0, 1);
-      lcd.print("              ->");
+      lcd.print("ERROR");
+      delay(2000);
       break;
-
-    case pageFlow:
-      lcd.setCursor(0, 0);
-      lcd.print("Durchfluss");
-      lcd.setCursor(0, 1);
-      lcd.print("              ->");
+    case 1:
+      this->goTo(5);
       break;
-
-    case pageSensor:
-      lcd.setCursor(0, 0);
-      lcd.print("Sonst. Sensoren");
-      lcd.setCursor(0, 1);
-      lcd.print("              ->");
-      break;
-
-    case pageFunction:
-      lcd.setCursor(0, 0);
-      lcd.print("Funktionen");
-      lcd.setCursor(0, 1);
-      lcd.print("              ->");
-      break;
-
-    case pageRelayStatus:
-      lcd.setCursor(0, 0);
-      lcd.print("Status Relais");
-      lcd.setCursor(0, 1);
-      lcd.print("              ->");
-      break;
-
-    case pageTest:
-      lcd.setCursor(0, 0);
-      lcd.print("Test");
-      lcd.setCursor(0, 1);
-      lcd.print("              ->");
-      break;
-
-    case pageTemp1:
-      lcd.setCursor(0, 0);
-      lcd.print("Vor Filter Temp");
-      lcd.setCursor(0, 1);
-      lcd.print(String(state.temp1) + " \xDF"
-                                "C");
-      break;
-
-    case pageTemp2:
-      lcd.setCursor(0, 0);
-      lcd.print("Nach Filter Temp");
-      lcd.setCursor(0, 1);
-      lcd.print(String(state.temp2) + " \xDF"
-                                "C");
-      break;
-
-    case pageWaterTotal:
-      lcd.setCursor(0, 0);
-      lcd.print("Wasser Total:");
-      lcd.setCursor(0, 1);
-      lcd.print("9999 L");
-      break;
-
-    case pageSensorStatus:
-      lcd.setCursor(0, 0);
-      lcd.print("Flow Sensor RAW:");
-      lcd.setCursor(0, 1);
-      lcd.print("23 IMP/M");
-      break;
-
-    case pageOverflowSensor:
-      lcd.setCursor(0, 0);
-      lcd.print("Overflow Sensor");
-      lcd.setCursor(0, 1);
-      lcd.print("offen");
-      break;
-
-    case pageSensor5:
-      lcd.setCursor(0, 0);
-      lcd.print("Dummy Sensor 1");
-      lcd.setCursor(0, 1);
-      lcd.print("offen");
-      break;
-
-    case pageSensor6:
-      lcd.setCursor(0, 0);
-      lcd.print("Dummy Sensor 2");
-      lcd.setCursor(0, 1);
-      lcd.print("offen");
-      break;
-
-    case pageDisinfection:
-      lcd.setCursor(0, 0);
-      lcd.print("Desinfektion");
-      lcd.setCursor(0, 1);
-      lcd.print("--> Starten <--");
-      break;
-
-    case pageFlushMembrane:
-      lcd.setCursor(0, 0);
-      lcd.print("Membran Sp"
-                "\xF5"
-                "len");
-      lcd.setCursor(0, 1);
-      lcd.print("--> Starten <--");
-      break;
-
-    case pageFlushSystem:
-      lcd.setCursor(0, 0);
-      lcd.print("System Sp"
-                "\xF5"
-                "len");
-      lcd.setCursor(0, 1);
-      lcd.print("--> Starten <--");
-      break;
-
-    case pageFillContainer:
-      lcd.setCursor(0, 0);
-      lcd.print("Kanister f"
-                "\xF5"
-                "llen");
-      lcd.setCursor(0, 1);
-      lcd.print("--> Starten <--");
-      break;
-
-    case pageRelay1:
-      lcd.setCursor(0, 0);
-      lcd.print("Relais Zulauf");
-      lcd.setCursor(0, 1);
-      lcd.print("offen");
-      break;
-
-    case pageRelay2:
-      lcd.setCursor(0, 0);
-      lcd.print("Relais Membran");
-      lcd.setCursor(0, 1);
-      lcd.print("offen");
-      break;
-
-    case pageRelay3:
-      lcd.setCursor(0, 0);
-      lcd.print("Relais Abfluss");
-      lcd.setCursor(0, 1);
-      lcd.print("offen");
-      break;
-
-    case pageRelay4:
-      lcd.setCursor(0, 0);
-      lcd.print("Relais Kanister");
-      lcd.setCursor(0, 1);
-      lcd.print("offen");
-      break;
-
-    case pageRelay5:
-      lcd.setCursor(0, 0);
-      lcd.print("Dummy R5");
-      lcd.setCursor(0, 1);
-      lcd.print("offen");
-      break;
-
-    case pageRelay6:
-      lcd.setCursor(0, 0);
-      lcd.print("Dummy R6");
-      lcd.setCursor(0, 1);
-      lcd.print("offen");
-      break;
-
-    case pageLedRingTest:
-      lcd.setCursor(0, 0);
-      lcd.print("Test LED Ring");
-      lcd.setCursor(0, 1);
-      lcd.print("Status: " + String(state.currentLedTest));
-      break;
-
-    case pageFactoryReset:
-      lcd.setCursor(0, 0);
-      lcd.print("Factory Reset");
-      lcd.setCursor(0, 1);
-      lcd.print("---> RESET <---");
-      break;
-
-    case pageResetConfirm:
-      lcd.setCursor(0, 0);
-      lcd.print("RESET");
-      lcd.setCursor(0, 1);
-      lcd.print("bestaetigen");
-      break;
-
-    case pageResetSuccess:
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("RESET");
-      lcd.setCursor(0, 1);
-      lcd.print("erfolgreich...");
+    case 2:
+      if (!this->state.preferences.begin("Config", false))
+      {
+        Serial.println("Failed to initialize NVS");
+        return;
+      }
+      this->state.preferences.putInt("iFlushSystem", 8);
+      this->state.intervallFlushSystem = 8;
+      this->state.preferences.putInt("iFlushMembrane", 24);
+      this->state.intervallFlushMembrane = 24;
+      this->state.preferences.end();
+      this->state.currentResetState = 0;
+      this->goTo(7);
+      this->getCurrentMenu().goTo(1);
       break;
     }
-  }
-  void handleOk() {
-    switch (this->getCurrentMenu().getCurrentPage()) {
-    case pageLedRingTest:
-      state.currentLedTest++;
-      if (state.currentLedTest > 6) {
-        state.currentLedTest = 0;
-      }
-      state.curState = (LedState)state.currentLedTest;
-      break;
-    case pageFillContainer:
-      state.fillContainer = true;
-      break;
-    case pageFlushMembrane:
-      state.flushMembrane = true;
-      break;
-    case pageFlushSystem:
-      state.flushSystem = true;
-      break;
-    case pageFactoryReset:
-    case pageResetConfirm:
-      state.currentResetState++;
-      switch (state.currentResetState) {
-      case 0:
-        lcd.setCursor(0, 0);
-        lcd.print("ERROR");
-        delay(2000);
-        break;
-      case 1:
-        this->goTo(5);
-        break;
-      case 2:
-        if (!state.preferences.begin("Config", false)) {
-          Serial.println("Failed to initialize NVS");
-          return;
-        }
-        state.preferences.putInt("iFlushSystem", 8);
-        state.intervallFlushSystem = 8;
-        state.preferences.putInt("iFlushMembrane", 24);
-        state.intervallFlushMembrane = 24;
-        state.preferences.end();
-        state.currentResetState = 0;
-        this->goTo(7);
-        this->getCurrentMenu().goTo(1);
-        break;
-      }
-      break;
+    break;
     }
     if (this->currentMenu == 0) {
-      this->next();
+    this->next();
     }
-  }
-  void task() {
-    this->startMillisIdle = millis();
-    this->reset();
-    lcd.clear();
-    while (true) {
-      if (state.rPressed) {
-        this->startMillisIdle = millis();
-        this->getCurrentMenu().next();
-        lcd.clear();
-        state.rPressed = false;
-      }
-      if (state.lPressed) {
-        this->startMillisIdle = millis();
-        this->getCurrentMenu().reset();
-        lcd.clear();
-        state.lPressed = false;
-      }
-      if (state.okPressed) {
-        this->startMillisIdle = millis();
-        this->handleOk();
-        lcd.clear();
-        state.okPressed = false;
-      }
-      this->display();
-      this->currentMillisIdle = millis();
-      if (this->currentMillisIdle - this->startMillisIdle >= 10000) {
-        break;
-      }
-      delay(500);
-      vTaskDelay(1);
+}
+void MenuManager::task()
+{
+  this->startMillisIdle = millis();
+  this->reset();
+  lcd.clear();
+  while (true)
+  {
+    if (this->state.rPressed)
+    {
+      this->startMillisIdle = millis();
+      this->getCurrentMenu().next();
+      lcd.clear();
+      this->state.rPressed = false;
     }
-    lcd.clear();
-    state.currentResetState = 0;
-    this->open = false;
-    vTaskDelete(this->taskhandle);
-  }
-  static void taskWrapper(void* parameters) {
-      MenuManager* instance = static_cast<MenuManager*>(parameters);
-      instance->task();
-  }
-public:
-  MenuManager(std::initializer_list<MenuEntry> menus, LiquidCrystal_I2C &lcd, State &state) : items(menus), lcd(lcd), state(state) {
-    this->currentMenu = 0;
-    this->startMillisIdle = millis();
+    if (this->state.lPressed)
+    {
+      this->startMillisIdle = millis();
+      this->getCurrentMenu().reset();
+      lcd.clear();
+      this->state.lPressed = false;
+    }
+    if (this->state.okPressed)
+    {
+      this->startMillisIdle = millis();
+      this->handleOk();
+      lcd.clear();
+      this->state.okPressed = false;
+    }
+    this->display();
     this->currentMillisIdle = millis();
-    this->open = false;
-  }
-  void next() {
-    this->currentMenu++;
-    if (this->currentMenu >= this->items.size()) {
-      this->currentMenu = 0;
+    if (this->currentMillisIdle - this->startMillisIdle >= 10000)
+    {
+      break;
     }
-    this->getCurrentMenu().reset();
+    delay(500);
+    vTaskDelay(1);
   }
-  void prev() {
-    this->currentMenu--;
-    if (this->currentMenu < 0) {
-      this->currentMenu = this->items.size() - 1;
-    }
-    this->getCurrentMenu().reset();
-  }
-  void reset() {
+  lcd.clear();
+  this->state.currentResetState = 0;
+  this->isOpen = false;
+  vTaskDelete(this->taskhandle);
+}
+MenuManager::MenuManager(std::initializer_list<MenuEntry> menus, LiquidCrystal_I2C &lcd, State &state) : items(menus), lcd(lcd), state(state)
+{
+  this->currentMenu = 0;
+  this->startMillisIdle = millis();
+  this->currentMillisIdle = millis();
+  this->isOpen = false;
+}
+bool MenuManager::next()
+{
+  this->currentMenu++;
+  if (this->currentMenu >= this->items.len)
+  {
     this->currentMenu = 0;
-    this->getCurrentMenu().reset();
+    return false;
   }
-  void goTo(int menu) {
-    this->currentMenu = menu;
-    if (this->currentMenu >= this->items.size()) {
-      this->currentMenu = 0;
-    }
-    this->getCurrentMenu().reset();
+  this->getCurrentMenu().reset();
+  return true;
+}
+bool MenuManager::prev()
+{
+  this->currentMenu--;
+  if (this->currentMenu < 0)
+  {
+    this->currentMenu = this->items.len - 1;
+    return false;
   }
-  void open() {
-    if (this->open) {
-      return;
-    }
-    this->open = true;
-    xTaskCreate(this->taskWrapper, "taskMenue", 10000, NULL, 1, &this->taskhandle);
+  this->getCurrentMenu().reset();
+  return true;
+}
+void MenuManager::reset()
+{
+  this->currentMenu = 0;
+  this->getCurrentMenu().reset();
+}
+void MenuManager::goTo(int menu)
+{
+  this->currentMenu = menu;
+  if (this->currentMenu >= this->items.len)
+  {
+    this->currentMenu = 0;
   }
-  void close() {
-    if (!this->open) {
-      return;
-    }
-    this->open = false;
-    vTaskDelete(this->taskhandle);
+  this->getCurrentMenu().reset();
+}
+void MenuManager::open()
+{
+  if (this->isOpen)
+  {
+    return;
   }
-  bool state() {
-    return this->open;
+  this->isOpen = true;
+  // closure [capture grouo](function args) {code}
+  xTaskCreate(&*[](void *parameter) {
+      auto self = static_cast<MenuManager*>(parameter);
+      self->task(); 
+  },
+  "taskMenue", 10000, this, 1, &this->taskhandle);
+}
+void MenuManager::close()
+{
+  if (!this->isOpen)
+  {
+    return;
   }
-  MenuEntry getCurrentMenu() { return this->items[this->currentMenu]; }
-};
+  this->isOpen = false;
+  vTaskDelete(this->taskhandle);
+}
+bool MenuManager::openState()
+{
+  return this->isOpen;
+}
+MenuEntry MenuManager::getCurrentMenu() { return this->items[this->currentMenu]; }

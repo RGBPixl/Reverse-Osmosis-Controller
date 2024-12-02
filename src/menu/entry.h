@@ -1,15 +1,18 @@
-#include <ArduinoSTL.h>
+#pragma once
+#include <Arduino.h>
+#include "../shitty_vec.h"
+#include "page.h"
 
 class MenuEntry {
 private:
-  std::vector<MenuPage> items;
+  ShittyVec<MenuPage> items;
   int currentPage;
-
 public:
   MenuEntry(std::initializer_list<MenuPage> pages);
-  void next();
-  void prev();
+  bool next();
+  bool prev();
   void reset();
   void goTo(int page);
   MenuPage getCurrentPage();
+  int getCurrentPageInt();
 };
