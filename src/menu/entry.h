@@ -6,27 +6,10 @@ private:
   int currentPage;
 
 public:
-  MenuEntry(std::initializer_list<MenuPage> pages) : items(pages) {
-    this->currentPage = 0;
-  }
-  void next() {
-    this->currentPage++;
-    if (this->currentPage >= this->items.size()) {
-      this->currentPage = 0;
-    }
-  }
-  void prev() {
-    this->currentPage--;
-    if (this->currentPage < 0) {
-      this->currentPage = this->items.size() - 1;
-    }
-  }
-  void reset() { this->currentPage = 0; }
-  void goTo(int page) {
-    this->currentPage = page;
-    if (this->currentPage >= this->items.size()) {
-      this->currentPage = 0;
-    }
-  }
-  MenuPage getCurrentPage() { return this->items[this->currentPage]; }
+  MenuEntry(std::initializer_list<MenuPage> pages);
+  void next();
+  void prev();
+  void reset();
+  void goTo(int page);
+  MenuPage getCurrentPage();
 };
