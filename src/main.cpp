@@ -15,17 +15,18 @@
 #include <WiFi.h>
 #include <Wire.h>
 #include <time.h>
+#include <math.h>
 
 #define ONE_WIRE_BUS 4
 #define LED_PIN 23
 #define LED_COUNT 8
-#define statusLED_red 18
-#define statusLED_green 19
-#define statusLED_blue 14
-#define button_l 15
-#define button_ok 2
-#define button_r 0
-#define floatSensor 36
+#define STATUS_LED_RED 18
+#define STATUS_LED_GREEN 19
+#define STATUS_LED_BLUE 14
+#define BUTTON_L 15
+#define BUTTON_OK 2
+#define BUTTON_R 0
+#define FLOAT_SENSOR 36
 
 Relais relais_1(12);
 Relais relais_2(27);
@@ -71,8 +72,8 @@ bool flushSystem = false;
 int hourOfDay;
 
 int testState = 0;
-double Temp1;
-double Temp2;
+double temp1;
+double temp2;
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
@@ -86,16 +87,14 @@ volatile bool okPressed = false;
 volatile bool lPressed = false;
 volatile bool rPressed = false;
 
-TaskHandle_t TaskHandle_1;
-
 void IRAM_ATTR handleButtonPressOK() { okPressed = true; }
 void IRAM_ATTR handleButtonPressL() { lPressed = true; }
 void IRAM_ATTR handleButtonPressR() { rPressed = true; }
 void IRAM_ATTR handleFlowImpulse() { flowImpulseCount++; }
 
 const char *ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 3600;
-const int daylightOffset_sec = 3600;
+const long gmtOffsetSec = 3600;
+const int daylightOffsetSec = 3600;
 
 struct tm timeinfo;
 
@@ -116,15 +115,15 @@ void setup() {
   Serial.begin(9600);
 
   pinMode(34, INPUT);
-  pinMode(statusLED_red, OUTPUT);
-  pinMode(statusLED_green, OUTPUT);
-  pinMode(statusLED_blue, OUTPUT);
+  pinMode(STATUS_LED_RED, OUTPUT);
+  pinMode(STATUS_LED_GREEN, OUTPUT);
+  pinMode(STATUS_LED_BLUE, OUTPUT);
 
-  pinMode(button_l, INPUT_PULLUP);
-  pinMode(button_ok, INPUT_PULLUP);
-  pinMode(button_r, INPUT_PULLUP);
+  pinMode(BUTTON_L, INPUT_PULLUP);
+  pinMode(BUTTON_OK, INPUT_PULLUP);
+  pinMode(BUTTON_R, INPUT_PULLUP);
 
-  pinMode(floatSensor, INPUT);
+  pinMode(FLOAT_SENSOR, INPUT);
 
   // Config aus NVS Speicher auslesen
   if (!preferences.begin("Config", true)) {
@@ -136,10 +135,10 @@ void setup() {
   intervallFlushMembrane = preferences.getInt("iFlushMembrane", 0);
   preferences.end();
 
-  attachInterrupt(digitalPinToInterrupt(button_ok), handleButtonPressOK,
+  attachInterrupt(digitalPinToInterrupt(BUTTON_OK), handleButtonPressOK,
                   FALLING);
-  attachInterrupt(digitalPinToInterrupt(button_l), handleButtonPressL, FALLING);
-  attachInterrupt(digitalPinToInterrupt(button_r), handleButtonPressR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_L), handleButtonPressL, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_R), handleButtonPressR, FALLING);
   attachInterrupt(digitalPinToInterrupt(34), handleFlowImpulse, FALLING);
 
   Serial.println("Starting WiFi...");
@@ -155,7 +154,7 @@ void setup() {
   Serial.println("WiFi connected.");
 
   // Init
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  configTime(gmtOffsetSec, daylightOffsetSec, ntpServer);
 
   // Init Temp Sensors
   sensors.begin();
@@ -198,7 +197,6 @@ void loop() {
 
   if (okPressed && !menuManager.state()) {
     menuManager.open();
-    xTaskCreate(taskMenu, "taskMenue", 10000, N∏ULL, 1, &TaskHandle_1);
     okPressed = false;
   }
 
@@ -216,8 +214,8 @@ void loop() {
   }
 
   sensors.requestTemperatures();
-  Temp1 = sensors.getTempCByIndex(0);
-  Temp2 = sensors.getTempCByIndex(1);
+  temp1 = sensors.getTempCByIndex(0);
+  temp2 = sensors.getTempCByIndex(1);
 
   delay(500);
 }
@@ -315,7 +313,7 @@ void taskScheduleManager(void *parameter) {
       relais_4.turnOn();
       while (true) {
         delay(500);
-        if (digitalRead(floatSensor)) {
+        if (digitalRead(FLOAT_SENSOR)) {
           relais_4.turnOff();
           fillContainer = false;
           break;
@@ -327,7 +325,6 @@ void taskScheduleManager(void *parameter) {
       shortStatus = "FLUSH M";
       lcd.clear();
       menuManager.close();
-      vTaskDelete(TaskHandle_1);
       relais_2.turnOn();  // Abwasserventil auf
       relais_3.turnOn();  // Membran-Bypass auf
       delay(5000);        // 300000 = 5m
@@ -342,7 +339,6 @@ void taskScheduleManager(void *parameter) {
       shortStatus = "FLUSH S";
       lcd.clear();
       menuManager.close();
-      vTaskDelete(TaskHandle_1);
       relais_2.turnOn();  // Abwasserventil auf
       delay(5000);        // 300000 = 5m
       relais_2.turnOff(); // Abwasserventil zu

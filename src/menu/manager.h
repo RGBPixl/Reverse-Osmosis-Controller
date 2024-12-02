@@ -6,7 +6,8 @@ private:
   int currentMenu;
   unsigned long startMillisIdle;
   unsigned long currentMillisIdle;
-  bool menuOpen;
+  bool open;
+  TaskHandle_t taskhandle;
 
   void display() {
     switch (this->getCurrentMenu().getCurrentPage()) {
@@ -57,7 +58,7 @@ private:
       lcd.setCursor(0, 0);
       lcd.print("Vor Filter Temp");
       lcd.setCursor(0, 1);
-      lcd.print(String(Temp1) + " \xDF"
+      lcd.print(String(temp1) + " \xDF"
                                 "C");
       break;
 
@@ -65,7 +66,7 @@ private:
       lcd.setCursor(0, 0);
       lcd.print("Nach Filter Temp");
       lcd.setCursor(0, 1);
-      lcd.print(String(Temp2) + " \xDF"
+      lcd.print(String(temp2) + " \xDF"
                                 "C");
       break;
 
@@ -267,7 +268,7 @@ public:
     this->currentMenu = 0;
     this->startMillisIdle = millis();
     this->currentMillisIdle = millis();
-    this->menuOpen = false;
+    this->open = false;
   }
   void task(void *parameter) {
     this->startMillisIdle = millis();
@@ -302,8 +303,8 @@ public:
     }
     lcd.clear();
     currentResetState = 0;
-    this->menuOpen = false;
-    vTaskDelete(NULL);
+    this->open = false;
+    vTaskDelete(this->taskhandle);
   }
   void next() {
     this->currentMenu++;
@@ -331,13 +332,21 @@ public:
     this->getCurrentMenu().reset();
   }
   void open() {
-    this->menuOpen = true;
+    if (this->open) {
+      return;
+    }
+    this->open = true;
+    xTaskCreate(this->task, "taskMenue", 10000, NULL, 1, &this->taskhandle);
   }
   void close() {
-    this->menuOpen = false;
+    if (!this->open) {
+      return;
+    }
+    this->open = false;
+    vTaskDelete(this->taskhandle);
   }
   bool state() {
-    return this->menuOpen;
+    return this->open;
   }
   MenuEntry getCurrentMenu() { return this->items[this->currentMenu]; }
 };
