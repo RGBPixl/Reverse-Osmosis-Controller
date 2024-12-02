@@ -1,8 +1,8 @@
-#include <Arduino.h>
 #include "entry.h"
 #include "page.h"
+#include <Arduino.h>
 
-MenuEntry::MenuEntry(std::initializer_list<MenuPage> pages): items(pages) {
+MenuEntry::MenuEntry(std::initializer_list<MenuPage> pages) : items(pages) {
   this->currentPage = 0;
 }
 

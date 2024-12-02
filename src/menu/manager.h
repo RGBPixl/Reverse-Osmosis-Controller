@@ -1,6 +1,6 @@
 #pragma once
-#include "../state.h"
 #include "../shitty_vec.h"
+#include "../state.h"
 #include "entry.h"
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
@@ -19,14 +19,16 @@ private:
   void display();
   void handleOk();
   void task();
+
 public:
-  MenuManager(std::initializer_list<MenuEntry> menus, LiquidCrystal_I2C &lcd, State &state);
+  MenuManager(std::initializer_list<MenuEntry> menus, LiquidCrystal_I2C &lcd,
+              State &state);
   bool next();
   bool prev();
   void reset();
   void goTo(int menu);
   void open();
-  void close(); 
+  void close();
   bool openState();
   MenuEntry getCurrentMenu();
 };

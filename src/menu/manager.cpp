@@ -1,14 +1,12 @@
 #include "manager.h"
+#include "../state.h"
 #include "entry.h"
 #include "page.h"
-#include "../state.h"
-#include "../shitty_vec.h"
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 
-void MenuManager::display()
-{
-    switch (this->getCurrentMenu().getCurrentPage()) {
+void MenuManager::display() {
+  switch (this->getCurrentMenu().getCurrentPage()) {
   case MenuPage::temp:
     lcd.setCursor(0, 0);
     lcd.print("Temperaturen");
@@ -206,15 +204,14 @@ void MenuManager::display()
     lcd.setCursor(0, 1);
     lcd.print("erfolgreich...");
     break;
-    }
+  }
 }
 
 void MenuManager::handleOk() {
   switch (this->getCurrentMenu().getCurrentPage()) {
   case MenuPage::ledRingTest:
     this->state.currentLedTest++;
-    if (this->state.currentLedTest > 6)
-    {
+    if (this->state.currentLedTest > 6) {
       this->state.currentLedTest = 0;
     }
     this->state.ledState = (LedState)this->state.currentLedTest;
@@ -231,8 +228,7 @@ void MenuManager::handleOk() {
   case MenuPage::factoryReset:
   case MenuPage::resetConfirm:
     this->state.currentResetState++;
-    switch (this->state.currentResetState)
-    {
+    switch (this->state.currentResetState) {
     case 0:
       lcd.setCursor(0, 0);
       lcd.print("ERROR");
@@ -242,8 +238,7 @@ void MenuManager::handleOk() {
       this->goTo(5);
       break;
     case 2:
-      if (!this->state.preferences.begin("Config", false))
-      {
+      if (!this->state.preferences.begin("Config", false)) {
         Serial.println("Failed to initialize NVS");
         return;
       }
@@ -258,34 +253,29 @@ void MenuManager::handleOk() {
       break;
     }
     break;
-    }
-    if (this->currentMenu == 0) {
+  }
+  if (this->currentMenu == 0) {
     this->next();
-    }
+  }
 }
-void MenuManager::task()
-{
+void MenuManager::task() {
   this->startMillisIdle = millis();
   this->reset();
   lcd.clear();
-  while (true)
-  {
-    if (this->state.rPressed)
-    {
+  while (true) {
+    if (this->state.rPressed) {
       this->startMillisIdle = millis();
       this->getCurrentMenu().next();
       lcd.clear();
       this->state.rPressed = false;
     }
-    if (this->state.lPressed)
-    {
+    if (this->state.lPressed) {
       this->startMillisIdle = millis();
       this->getCurrentMenu().reset();
       lcd.clear();
       this->state.lPressed = false;
     }
-    if (this->state.okPressed)
-    {
+    if (this->state.okPressed) {
       this->startMillisIdle = millis();
       this->handleOk();
       lcd.clear();
@@ -293,8 +283,7 @@ void MenuManager::task()
     }
     this->display();
     this->currentMillisIdle = millis();
-    if (this->currentMillisIdle - this->startMillisIdle >= 10000)
-    {
+    if (this->currentMillisIdle - this->startMillisIdle >= 10000) {
       break;
     }
     delay(500);
@@ -305,74 +294,64 @@ void MenuManager::task()
   this->isOpen = false;
   vTaskDelete(this->taskhandle);
 }
-MenuManager::MenuManager(std::initializer_list<MenuEntry> menus, LiquidCrystal_I2C &lcd, State &state) : items(menus), lcd(lcd), state(state)
-{
+MenuManager::MenuManager(std::initializer_list<MenuEntry> menus,
+                         LiquidCrystal_I2C &lcd, State &state)
+    : items(menus), lcd(lcd), state(state) {
   this->currentMenu = 0;
   this->startMillisIdle = millis();
   this->currentMillisIdle = millis();
   this->isOpen = false;
 }
-bool MenuManager::next()
-{
+bool MenuManager::next() {
   this->currentMenu++;
-  if (this->currentMenu >= this->items.len)
-  {
+  if (this->currentMenu >= this->items.len) {
     this->currentMenu = 0;
     return false;
   }
   this->getCurrentMenu().reset();
   return true;
 }
-bool MenuManager::prev()
-{
+bool MenuManager::prev() {
   this->currentMenu--;
-  if (this->currentMenu < 0)
-  {
+  if (this->currentMenu < 0) {
     this->currentMenu = this->items.len - 1;
     return false;
   }
   this->getCurrentMenu().reset();
   return true;
 }
-void MenuManager::reset()
-{
+void MenuManager::reset() {
   this->currentMenu = 0;
   this->getCurrentMenu().reset();
 }
-void MenuManager::goTo(int menu)
-{
+void MenuManager::goTo(int menu) {
   this->currentMenu = menu;
-  if (this->currentMenu >= this->items.len)
-  {
+  if (this->currentMenu >= this->items.len) {
     this->currentMenu = 0;
   }
   this->getCurrentMenu().reset();
 }
-void MenuManager::open()
-{
-  if (this->isOpen)
-  {
+void MenuManager::open() {
+  if (this->isOpen) {
     return;
   }
   this->isOpen = true;
   // closure [capture grouo](function args) {code}
-  xTaskCreate(&*[](void *parameter) {
-      auto self = static_cast<MenuManager*>(parameter);
-      self->task(); 
-  },
-  "taskMenue", 10000, this, 1, &this->taskhandle);
+  xTaskCreate(
+      &*[](void *parameter) {
+        auto self = static_cast<MenuManager *>(parameter);
+        self->task();
+      },
+      "taskMenue", 10000, this, 1, &this->taskhandle);
 }
-void MenuManager::close()
-{
-  if (!this->isOpen)
-  {
+void MenuManager::close() {
+  if (!this->isOpen) {
     return;
   }
   this->isOpen = false;
   vTaskDelete(this->taskhandle);
 }
-bool MenuManager::openState()
-{
-  return this->isOpen;
+bool MenuManager::openState() { return this->isOpen; }
+MenuEntry MenuManager::getCurrentMenu() {
+  return this->items[this->currentMenu];
 }
-MenuEntry MenuManager::getCurrentMenu() { return this->items[this->currentMenu]; }

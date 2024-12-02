@@ -1,10 +1,10 @@
 // FastLED Warnung ignorieren
 #define FASTLED_INTERNAL
 
+#include "led.h"
 #include "menu/entry.h"
 #include "menu/manager.h"
 #include "menu/page.h"
-#include "led.h"
 #include "relais.h"
 #include "secrets.h"
 #include "state.h"
@@ -17,7 +17,6 @@
 #include <Wire.h>
 #include <math.h>
 #include <time.h>
-#include <algorithm>
 
 #define ONE_WIRE_BUS 4
 #define STATUS_LED_RED 18
@@ -35,15 +34,17 @@ Relais relais_4(25);
 Relais relais_5(33);
 Relais relais_6(32);
 
-MenuEntry mainMenu({MenuPage::temp, MenuPage::flow, MenuPage::sensor, MenuPage::function,
-                    MenuPage::relayStatus, MenuPage::test});
+MenuEntry mainMenu({MenuPage::temp, MenuPage::flow, MenuPage::sensor,
+                    MenuPage::function, MenuPage::relayStatus, MenuPage::test});
 MenuEntry tempMenu({MenuPage::temp1, MenuPage::temp2});
 MenuEntry flowMenu({MenuPage::waterTotal, MenuPage::sensorStatus});
-MenuEntry sensorMenu({MenuPage::overflowSensor, MenuPage::sensor5, MenuPage::sensor6});
-MenuEntry functionMenu({MenuPage::disinfection, MenuPage::flushMembrane, MenuPage::flushSystem,
-                        MenuPage::fillContainer, MenuPage::factoryReset});
-MenuEntry relayMenu({MenuPage::relay1, MenuPage::relay2, MenuPage::relay3, MenuPage::relay4, MenuPage::relay5,
-                     MenuPage::relay6});
+MenuEntry sensorMenu({MenuPage::overflowSensor, MenuPage::sensor5,
+                      MenuPage::sensor6});
+MenuEntry functionMenu({MenuPage::disinfection, MenuPage::flushMembrane,
+                        MenuPage::flushSystem, MenuPage::fillContainer,
+                        MenuPage::factoryReset});
+MenuEntry relayMenu({MenuPage::relay1, MenuPage::relay2, MenuPage::relay3,
+                     MenuPage::relay4, MenuPage::relay5, MenuPage::relay6});
 MenuEntry testMenu({MenuPage::ledRingTest});
 MenuEntry hiddenMenu({MenuPage::resetConfirm, MenuPage::resetSuccess});
 
