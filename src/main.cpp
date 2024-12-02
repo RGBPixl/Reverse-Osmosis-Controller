@@ -1,4 +1,3 @@
-#pragma once
 // FastLED Warnung ignorieren
 #define FASTLED_INTERNAL
 

@@ -1,5 +1,7 @@
+#pragma once
 #include "../state.h"
 #include "../shitty_vec.h"
+#include "entry.h"
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 

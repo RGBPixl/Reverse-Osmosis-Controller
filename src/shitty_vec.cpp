@@ -8,7 +8,7 @@ template <typename T> ShittyVec<T>::ShittyVec(std::initializer_list<T> items) {
     this.items = items._M_array;
 }
 
-template <typename T> const void ShittyVec<T>::push(T item) const {
+template <typename T> void ShittyVec<T>::push(T item) const {
     this.items[this.len++] = item;
 }
 
