@@ -1,5 +1,7 @@
 #pragma once
-#include <FastLED.h>
+
+#define LED_COUNT 8
+#define LED_PIN 23
 
 enum LedState {
   staticRed,
@@ -13,6 +15,4 @@ enum LedState {
 
 void ledTask(void *parameter);
 
-#define LED_COUNT 8
-
-CRGB leds[LED_COUNT];
+void setupLeds();

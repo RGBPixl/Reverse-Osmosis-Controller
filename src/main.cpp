@@ -10,7 +10,6 @@
 #include "state.h"
 #include <Arduino.h>
 #include <DallasTemperature.h>
-#include <FastLED.h>
 #include <LiquidCrystal_I2C.h>
 #include <OneWire.h>
 #include <Preferences.h>
@@ -21,7 +20,6 @@
 #include <algorithm>
 
 #define ONE_WIRE_BUS 4
-#define LED_PIN 23
 #define STATUS_LED_RED 18
 #define STATUS_LED_GREEN 19
 #define STATUS_LED_BLUE 14
@@ -129,8 +127,7 @@ void setup() {
   lcd.backlight();
 
   // Init LED-Ring
-  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, LED_COUNT);
-  FastLED.setBrightness(30);
+  setupLeds();
 
   // Get Time from NTP Server
   getTime();

@@ -1,6 +1,8 @@
 #include "led.h"
 #include <FastLED.h>
 
+CRGB leds[LED_COUNT];
+
 void ledTask(void *parameter) {
   auto state = (LedState *)parameter;
 
@@ -57,4 +59,9 @@ void ledTask(void *parameter) {
 
     vTaskDelay(1); // Leichtes Yielding, um den Watchdog nicht zu triggern
   }
+}
+
+void setupLeds() {
+  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, LED_COUNT);
+  FastLED.setBrightness(30);
 }

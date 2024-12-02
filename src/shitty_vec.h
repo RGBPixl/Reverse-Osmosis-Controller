@@ -3,15 +3,22 @@
 
 template <typename T>
 class ShittyVec {
-public:
-  uint len;
-
-  ShittyVec(std::initializer_list<T> items);
-
-  const T& operator[](int index) const;
-  //Shark really wanted this we never actually use it... ._.
-  void push(T) const;
 private:
   T items[16];
-};
+public:
+  uint len = 0;
 
+  ShittyVec(std::initializer_list<T> items): items({}) {
+    for (auto item : items){
+      this->push(item);
+    }
+  };
+
+  T& operator[](int index){
+    return this->items[index];
+  };
+  //Shark really wanted this we never actually use it... ._.
+  void push(T item) {
+    this->items[this->len++] = item;
+  };
+};
