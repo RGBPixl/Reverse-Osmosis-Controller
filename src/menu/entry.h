@@ -1,11 +1,11 @@
 #pragma once
-#include "../shitty_vec.h"
 #include "page.h"
 #include <Arduino.h>
+#include <Vector.h>
 
 class MenuEntry {
 private:
-  ShittyVec<MenuPage> items;
+  Vector<MenuPage> items;
   int currentPage;
 
 public:

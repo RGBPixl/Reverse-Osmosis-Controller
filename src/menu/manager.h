@@ -1,13 +1,13 @@
 #pragma once
-#include "../shitty_vec.h"
 #include "../state.h"
 #include "entry.h"
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
+#include <Vector.h>
 
 class MenuManager {
 private:
-  ShittyVec<MenuEntry> items;
+  Vector<MenuEntry> items;
   int currentMenu;
   unsigned long startMillisIdle;
   unsigned long currentMillisIdle;

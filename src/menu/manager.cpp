@@ -296,7 +296,10 @@ void MenuManager::task() {
 }
 MenuManager::MenuManager(std::initializer_list<MenuEntry> menus,
                          LiquidCrystal_I2C &lcd, State &state)
-    : items(menus), lcd(lcd), state(state) {
+    : lcd(lcd), state(state) {
+  for (auto menu : menus) {
+    this->items.push_back(menu);
+  }
   this->currentMenu = 0;
   this->startMillisIdle = millis();
   this->currentMillisIdle = millis();
@@ -304,7 +307,7 @@ MenuManager::MenuManager(std::initializer_list<MenuEntry> menus,
 }
 bool MenuManager::next() {
   this->currentMenu++;
-  if (this->currentMenu >= this->items.len) {
+  if (this->currentMenu >= this->items.size()) {
     this->currentMenu = 0;
     return false;
   }
@@ -314,7 +317,7 @@ bool MenuManager::next() {
 bool MenuManager::prev() {
   this->currentMenu--;
   if (this->currentMenu < 0) {
-    this->currentMenu = this->items.len - 1;
+    this->currentMenu = this->items.size() - 1;
     return false;
   }
   this->getCurrentMenu().reset();
@@ -326,7 +329,7 @@ void MenuManager::reset() {
 }
 void MenuManager::goTo(int menu) {
   this->currentMenu = menu;
-  if (this->currentMenu >= this->items.len) {
+  if (this->currentMenu >= this->items.size()) {
     this->currentMenu = 0;
   }
   this->getCurrentMenu().reset();
