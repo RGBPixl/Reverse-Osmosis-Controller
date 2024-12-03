@@ -12,8 +12,9 @@ public:
   MenuEntry(std::initializer_list<MenuPage> pages);
   bool next();
   bool prev();
-  void reset();
   void goTo(int page);
-  MenuPage getCurrentPage();
-  int getCurrentPageInt();
+
+  inline MenuPage getCurrentPage(){ return this->items[this->currentPage]; };
+  inline int getCurrentPageInt(){ return this->currentPage; };
+  inline void reset() { this->currentPage = 0; };
 };

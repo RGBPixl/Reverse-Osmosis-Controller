@@ -10,59 +10,57 @@ void MenuManager::display() {
   case MenuPage::temp:
     lcd.setCursor(0, 0);
     lcd.print("Temperaturen");
-    lcd.setCursor(0, 1);
-    lcd.print("              ->");
+    lcd.setCursor(14, 1);
+    lcd.print("->");
     break;
 
   case MenuPage::flow:
     lcd.setCursor(0, 0);
     lcd.print("Durchfluss");
-    lcd.setCursor(0, 1);
-    lcd.print("              ->");
+    lcd.setCursor(14, 1);
+    lcd.print("->");
     break;
 
   case MenuPage::sensor:
     lcd.setCursor(0, 0);
     lcd.print("Sonst. Sensoren");
-    lcd.setCursor(0, 1);
-    lcd.print("              ->");
+    lcd.setCursor(14, 1);
+    lcd.print("->");
     break;
 
   case MenuPage::function:
     lcd.setCursor(0, 0);
     lcd.print("Funktionen");
-    lcd.setCursor(0, 1);
-    lcd.print("              ->");
+    lcd.setCursor(14, 1);
+    lcd.print("->");
     break;
 
   case MenuPage::relayStatus:
     lcd.setCursor(0, 0);
     lcd.print("Status Relais");
-    lcd.setCursor(0, 1);
-    lcd.print("              ->");
+    lcd.setCursor(14, 1);
+    lcd.print("->");
     break;
 
   case MenuPage::test:
     lcd.setCursor(0, 0);
     lcd.print("Test");
-    lcd.setCursor(0, 1);
-    lcd.print("              ->");
+    lcd.setCursor(14, 1);
+    lcd.print("->");
     break;
 
   case MenuPage::temp1:
     lcd.setCursor(0, 0);
     lcd.print("Vor Filter Temp");
     lcd.setCursor(0, 1);
-    lcd.print(String(state.temp1) + " \xDF"
-                                    "C");
+    lcd.printf("%.2f %sC", state.temp1, "\xDF");
     break;
 
   case MenuPage::temp2:
     lcd.setCursor(0, 0);
     lcd.print("Nach Filter Temp");
     lcd.setCursor(0, 1);
-    lcd.print(String(state.temp2) + " \xDF"
-                                    "C");
+    lcd.printf("%.2f %sC", state.temp2, "\xDF");
     break;
 
   case MenuPage::waterTotal:
@@ -109,27 +107,21 @@ void MenuManager::display() {
 
   case MenuPage::flushMembrane:
     lcd.setCursor(0, 0);
-    lcd.print("Membran Sp"
-              "\xF5"
-              "len");
+    lcd.printf("Membran Sp%slen", "\xF5");
     lcd.setCursor(0, 1);
     lcd.print("--> Starten <--");
     break;
 
   case MenuPage::flushSystem:
     lcd.setCursor(0, 0);
-    lcd.print("System Sp"
-              "\xF5"
-              "len");
+    lcd.printf("System Sp%slen", "\xF5");
     lcd.setCursor(0, 1);
     lcd.print("--> Starten <--");
     break;
 
   case MenuPage::fillContainer:
     lcd.setCursor(0, 0);
-    lcd.print("Kanister f"
-              "\xF5"
-              "llen");
+    lcd.printf("Kanister f%sllen", "\xF5");
     lcd.setCursor(0, 1);
     lcd.print("--> Starten <--");
     break;
@@ -180,7 +172,7 @@ void MenuManager::display() {
     lcd.setCursor(0, 0);
     lcd.print("Test LED Ring");
     lcd.setCursor(0, 1);
-    lcd.print("Status: " + String(this->state.currentLedTest));
+    lcd.printf("Status: %d", state.currentLedTest);
     break;
 
   case MenuPage::factoryReset:
@@ -203,6 +195,11 @@ void MenuManager::display() {
     lcd.print("RESET");
     lcd.setCursor(0, 1);
     lcd.print("erfolgreich...");
+    break;
+  
+  default:
+    lcd.setCursor(0, 0);
+    lcd.print("unknown Page");
     break;
   }
 }
@@ -235,7 +232,7 @@ void MenuManager::handleOk() {
       delay(2000);
       break;
     case 1:
-      this->goTo(5);
+      this->goTo(5); // 5 = relayMenu ?
       break;
     case 2:
       if (!this->state.preferences.begin("Config", false)) {
@@ -248,8 +245,8 @@ void MenuManager::handleOk() {
       this->state.intervallFlushMembrane = 24;
       this->state.preferences.end();
       this->state.currentResetState = 0;
-      this->goTo(7);
-      this->getCurrentMenu().goTo(1);
+      this->goTo(7); // 7 = hiddenMenu ?
+      this->getCurrentMenu().goTo(1); // 7->1 = resetSuccess 
       break;
     }
     break;
@@ -258,6 +255,7 @@ void MenuManager::handleOk() {
     this->next();
   }
 }
+
 void MenuManager::task() {
   this->startMillisIdle = millis();
   this->reset();
@@ -305,6 +303,7 @@ MenuManager::MenuManager(std::initializer_list<MenuEntry> menus,
   this->currentMillisIdle = millis();
   this->isOpen = false;
 }
+
 bool MenuManager::next() {
   this->currentMenu++;
   if (this->currentMenu >= this->items.size()) {
@@ -314,47 +313,47 @@ bool MenuManager::next() {
   this->getCurrentMenu().reset();
   return true;
 }
+
 bool MenuManager::prev() {
-  this->currentMenu--;
-  if (this->currentMenu < 0) {
+  if (this->currentMenu <= 0) {
     this->currentMenu = this->items.size() - 1;
     return false;
   }
+  this->currentMenu--;
   this->getCurrentMenu().reset();
   return true;
 }
+
+// goTo first element of MenuPage of current MenuEntry
 void MenuManager::reset() {
-  this->currentMenu = 0;
-  this->getCurrentMenu().reset();
+  this->goTo(0);
 }
+
+// go to specified MenuPage of current MenuEntry
 void MenuManager::goTo(int menu) {
-  this->currentMenu = menu;
-  if (this->currentMenu >= this->items.size()) {
-    this->currentMenu = 0;
-  }
+  this->currentMenu = menu < this->items.size() ? menu : 0;
   this->getCurrentMenu().reset();
 }
+
 void MenuManager::open() {
   if (this->isOpen) {
     return;
   }
   this->isOpen = true;
   // closure [capture grouo](function args) {code}
-  xTaskCreate(
-      &*[](void *parameter) {
+  xTaskCreate( 
+    &*[](void *parameter) {
         auto self = static_cast<MenuManager *>(parameter);
         self->task();
       },
-      "taskMenue", 10000, this, 1, &this->taskhandle);
+      "taskMenue", 10000, this, 1, &this->taskhandle
+    );
 }
+
 void MenuManager::close() {
   if (!this->isOpen) {
     return;
   }
   this->isOpen = false;
   vTaskDelete(this->taskhandle);
-}
-bool MenuManager::openState() { return this->isOpen; }
-MenuEntry MenuManager::getCurrentMenu() {
-  return this->items[this->currentMenu];
 }

@@ -29,6 +29,6 @@ public:
   void goTo(int menu);
   void open();
   void close();
-  bool openState();
-  MenuEntry getCurrentMenu();
+  inline bool openState() { return this->isOpen; };
+  inline MenuEntry getCurrentMenu() { return this->items[this->currentMenu];};
 };

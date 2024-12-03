@@ -3,7 +3,7 @@
 #include <Arduino.h>
 
 MenuEntry::MenuEntry(std::initializer_list<MenuPage> pages) {
-  for (auto page : pages) {
+  for (MenuPage page : pages) {
     this->items.push_back(page);
   }
   this->currentPage = 0;
@@ -27,12 +27,9 @@ bool MenuEntry::prev() {
   return true;
 }
 
-void MenuEntry::reset() { this->currentPage = 0; }
 void MenuEntry::goTo(int page) {
   this->currentPage = page;
   if (this->currentPage >= this->items.size()) {
     this->currentPage = 0;
   }
 }
-MenuPage MenuEntry::getCurrentPage() { return this->items[this->currentPage]; }
-int MenuEntry::getCurrentPageInt() { return this->currentPage; }
