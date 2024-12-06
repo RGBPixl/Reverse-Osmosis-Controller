@@ -1,6 +1,3 @@
-// FastLED Warnung ignorieren
-#define FASTLED_INTERNAL
-
 #include "led.h"
 #include "menu/entry.h"
 #include "menu/manager.h"
@@ -22,56 +19,53 @@
 #define STATUS_LED_RED 18
 #define STATUS_LED_GREEN 19
 #define STATUS_LED_BLUE 14
-#define BUTTON_L 15
 #define BUTTON_OK 2
+#define BUTTON_L 15
 #define BUTTON_R 0
+#define FLOW_SENSOR 34
 #define FLOAT_SENSOR 36
 
-Relais relais_1(12);
-Relais relais_2(27);
-Relais relais_3(26);
-Relais relais_4(25);
-Relais relais_5(33);
-Relais relais_6(32);
+#define NTP_SERVER "pool.ntp.org"
+#define GMT_OFFSET_SEC 3600
+#define DAYLIGHT_OFFSET_SEC 3600
 
-MenuEntry mainMenu({MenuPage::temp, MenuPage::flow, MenuPage::sensor,
+#define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
+
+static Relais relais[] = {Relais(12), Relais(27), Relais(26), Relais(25), Relais(33), Relais(32)};
+
+static MenuEntry mainMenu({MenuPage::temp, MenuPage::flow, MenuPage::sensor, 
                     MenuPage::function, MenuPage::relayStatus, MenuPage::test});
-MenuEntry tempMenu({MenuPage::temp1, MenuPage::temp2});
-MenuEntry flowMenu({MenuPage::waterTotal, MenuPage::sensorStatus});
-MenuEntry sensorMenu({MenuPage::overflowSensor, MenuPage::sensor5,
+static MenuEntry tempMenu({MenuPage::temp1, MenuPage::temp2});
+static MenuEntry flowMenu({MenuPage::waterTotal, MenuPage::sensorStatus});
+static MenuEntry sensorMenu({MenuPage::overflowSensor, MenuPage::sensor5,
                       MenuPage::sensor6});
-MenuEntry functionMenu({MenuPage::disinfection, MenuPage::flushMembrane,
+static MenuEntry functionMenu({MenuPage::disinfection, MenuPage::flushMembrane,
                         MenuPage::flushSystem, MenuPage::fillContainer,
                         MenuPage::factoryReset});
-MenuEntry relayMenu({MenuPage::relay1, MenuPage::relay2, MenuPage::relay3,
+static MenuEntry relayMenu({MenuPage::relay1, MenuPage::relay2, MenuPage::relay3,
                      MenuPage::relay4, MenuPage::relay5, MenuPage::relay6});
-MenuEntry testMenu({MenuPage::ledRingTest});
-MenuEntry hiddenMenu({MenuPage::resetConfirm, MenuPage::resetSuccess});
+static MenuEntry testMenu({MenuPage::ledRingTest});
+static MenuEntry hiddenMenu({MenuPage::resetConfirm, MenuPage::resetSuccess});
 
-OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature sensors(&oneWire);
+static OneWire oneWire(ONE_WIRE_BUS);
+static DallasTemperature sensors(&oneWire);
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+static LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-State state;
+static State state;
 
-MenuManager menuManager({mainMenu, tempMenu, flowMenu, sensorMenu, functionMenu,
+static MenuManager menuManager({mainMenu, tempMenu, flowMenu, sensorMenu, functionMenu,
                          relayMenu, testMenu, hiddenMenu},
                         lcd, state);
+
+static struct tm timeinfo;
 
 void IRAM_ATTR handleButtonPressOK() { state.okPressed = true; }
 void IRAM_ATTR handleButtonPressL() { state.lPressed = true; }
 void IRAM_ATTR handleButtonPressR() { state.rPressed = true; }
 void IRAM_ATTR handleFlowImpulse() { state.flowImpulseCount++; }
 
-const char *ntpServer = "pool.ntp.org";
-const long gmtOffsetSec = 3600;
-const int daylightOffsetSec = 3600;
-
-struct tm timeinfo;
-
 // Funktionsdeklarationen
-void getTime();
 void taskScheduleManager(void *);
 
 void setup() {
@@ -99,11 +93,10 @@ void setup() {
   state.intervallFlushMembrane = state.preferences.getInt("iFlushMembrane", 0);
   state.preferences.end();
 
-  attachInterrupt(digitalPinToInterrupt(BUTTON_OK), handleButtonPressOK,
-                  FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_OK), handleButtonPressOK, FALLING);
   attachInterrupt(digitalPinToInterrupt(BUTTON_L), handleButtonPressL, FALLING);
   attachInterrupt(digitalPinToInterrupt(BUTTON_R), handleButtonPressR, FALLING);
-  attachInterrupt(digitalPinToInterrupt(34), handleFlowImpulse, FALLING);
+  attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR), handleFlowImpulse, FALLING);
 
   Serial.println("Starting WiFi...");
   // Connect to Wi-Fi
@@ -118,7 +111,7 @@ void setup() {
   Serial.println("WiFi connected.");
 
   // Init
-  configTime(gmtOffsetSec, daylightOffsetSec, ntpServer);
+  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
 
   // Init Temp Sensors
   sensors.begin();
@@ -131,21 +124,16 @@ void setup() {
   setupLeds();
 
   // Get Time from NTP Server
-  getTime();
+  if (!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to obtain time");
+    exit(-1);
+  }
 
   // Create Threads
   xTaskCreate(ledTask, "taskOne", 10000, &state.ledState, 1, NULL);
   xTaskCreate(taskScheduleManager, "taskScheduleManager", 10000, NULL, 1, NULL);
 
-  state.shortStatus = "OK";
-}
-
-void getTime() {
-
-  if (!getLocalTime(&timeinfo)) {
-    Serial.println("Failed to obtain time");
-    return;
-  }
+  sprintf(state.shortStatus, "OK");  
 }
 
 void loop() {
@@ -155,7 +143,10 @@ void loop() {
   }
 
   // printMemoryUsage();
-  getTime();
+  if (!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to obtain time");
+    exit(-1);
+  }
   state.hourOfDay = timeinfo.tm_hour;
 
   if (state.okPressed && !menuManager.openState()) {
@@ -167,10 +158,10 @@ void loop() {
 
   if (!menuManager.openState()) {
     lcd.setCursor(0, 0);
-    lcd.print("Status: " + state.shortStatus);
+    lcd.printf("Status: %s", *state.shortStatus);
     lcd.setCursor(0, 1);
-    lcd.print("Wasser: " + String(state.flowLiters) + "L");
-    if (state.shortStatus.length() < 3) {
+    lcd.printf("Wasser: %.2fL", state.flowLiters);
+    if (ARRAY_SIZE(state.shortStatus) < 3) {
       lcd.setCursor(11, 0);
       lcd.print(&timeinfo, "%R");
     }
@@ -191,14 +182,14 @@ void taskScheduleManager(void *parameter) {
   while (true) {
 
     if (startup) {
-      relais_1.turnOn(); // Frischwasserzulauf auf
+      relais[0].turnOn(); // Frischwasserzulauf auf
       delay(500);
-      relais_2.turnOn();  // Abwasserventil auf
+      relais[1].turnOn();  // Abwasserventil auf
       delay(2000);        // 300000 = 5m
-      relais_3.turnOn();  // Membran-Bypass auf
+      relais[2].turnOn();  // Membran-Bypass auf
       delay(2000);        // 300000 = 5m
-      relais_3.turnOff(); // Membran-Bypass zu
-      relais_2.turnOff(); // Abwasserventil zu
+      relais[2].turnOff(); // Membran-Bypass zu
+      relais[1].turnOff(); // Abwasserventil zu
       startup = false;
       startMillisFlush = millis();
     }
@@ -207,18 +198,18 @@ void taskScheduleManager(void *parameter) {
     currentMillisFlush = millis();
     if (currentMillisFlush - startMillisFlush >=
         (state.intervallFlushSystem * 3600000)) {
-      relais_2.turnOn(); // Abwasserventil auf
+      relais[1].turnOn(); // Abwasserventil auf
       delay(300000);
-      relais_2.turnOff(); // Abwasserventil zu
+      relais[1].turnOff(); // Abwasserventil zu
       startMillisFlush = millis();
     }
 
     if (state.fillContainer) {
-      relais_4.turnOn();
+      relais[3].turnOn();
       while (true) {
         delay(500);
         if (digitalRead(FLOAT_SENSOR)) {
-          relais_4.turnOff();
+          relais[3].turnOff();
           state.fillContainer = false;
           break;
         }
@@ -226,28 +217,28 @@ void taskScheduleManager(void *parameter) {
     }
 
     if (state.flushMembrane) {
-      state.shortStatus = "FLUSH M";
+      sprintf(state.shortStatus, "FLUSH M");
       lcd.clear();
       menuManager.close();
-      relais_2.turnOn();  // Abwasserventil auf
-      relais_3.turnOn();  // Membran-Bypass auf
+      relais[1].turnOn();  // Abwasserventil auf
+      relais[2].turnOn();  // Membran-Bypass auf
       delay(5000);        // 300000 = 5m
-      relais_3.turnOff(); // Membran-Bypass zu
-      relais_2.turnOff(); // Abwasserventil zu
+      relais[2].turnOff(); // Membran-Bypass zu
+      relais[1].turnOff(); // Abwasserventil zu
       state.flushMembrane = false;
-      state.shortStatus = "OK";
+      sprintf(state.shortStatus, "OK");
       lcd.clear();
     }
 
     if (state.flushSystem) {
-      state.shortStatus = "FLUSH S";
+      sprintf(state.shortStatus, "FLUSH S");
       lcd.clear();
       menuManager.close();
-      relais_2.turnOn();  // Abwasserventil auf
+      relais[1].turnOn();  // Abwasserventil auf
       delay(5000);        // 300000 = 5m
-      relais_2.turnOff(); // Abwasserventil zu
+      relais[1].turnOff(); // Abwasserventil zu
       state.flushSystem = false;
-      state.shortStatus = "OK";
+      sprintf(state.shortStatus, "OK");
       lcd.clear();
     }
 

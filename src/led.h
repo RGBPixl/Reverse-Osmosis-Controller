@@ -5,14 +5,13 @@
 
 enum LedState {
   staticRed,
-  spinningRed,
-  staticRainbow,
   staticGreen,
   staticBlue,
+  staticRainbow,
+  spinningRed,
   spinningBlue,
   spinningRainbow
 };
 
-void ledTask(void *parameter);
-
 void setupLeds();
+void ledTask(void *parameter);
