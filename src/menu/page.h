@@ -1,0 +1,31 @@
+#pragma once
+
+enum class MenuPage {
+  temp,
+  flow,
+  sensor,
+  function,
+  relayStatus,
+  test,
+  temp1,
+  temp2,
+  waterTotal,
+  sensorStatus,
+  overflowSensor,
+  sensor5,
+  sensor6,
+  disinfection,
+  flushMembrane,
+  flushSystem,
+  fillContainer,
+  factoryReset,
+  relay1,
+  relay2,
+  relay3,
+  relay4,
+  relay5,
+  relay6,
+  ledRingTest,
+  resetConfirm,
+  resetSuccess
+};
