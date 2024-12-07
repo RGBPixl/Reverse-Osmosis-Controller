@@ -1,16 +1,18 @@
 #pragma once
 #include "esp32-hal-gpio.h"
+
 class Relais {
 private:
-  int relaisPin;
+  uint8_t relaisPin;
 
 public:
-  Relais(int rPin) {
-    relaisPin = rPin;
+  inline Relais(int rPin) : relaisPin(rPin) {
     pinMode(relaisPin, OUTPUT);
   }
 
-  void turnOn() { digitalWrite(relaisPin, HIGH); }
+  inline ~Relais() { Serial.print("Relais destroyed"); }
 
-  void turnOff() { digitalWrite(relaisPin, LOW); }
+  inline void turnOn() { digitalWrite(relaisPin, HIGH); }
+
+  inline void turnOff() { digitalWrite(relaisPin, LOW); }
 };
