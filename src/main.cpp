@@ -59,7 +59,7 @@ MenuManager *menuManager;
 
 struct tm timeinfo;
 
-ErrorType error_state = ERROR_OK1234;
+ErrorType error_state = ErrorOK;
 
 // Funktionsdeklarationen
 void IRAM_ATTR handleButtonPressOK(){ state->okPressed = true; }
@@ -74,20 +74,20 @@ void loop();
 int main(int argc, char **argv){
   setup();
 
-  while(true && error_state == ERROR_OK1234) {
+  while(true && error_state == ErrorOK) {
     loop();
   }
 
   switch (error_state) {
-  case ERROR_OK1234:
+  case ErrorOK:
     break;
-  case ERROR_WLAN1234:
+  case ErrorWIFI:
     Serial.print("keine WLAN Verbindung");
     break;
-  case ERROR_VARS1234:
+  case ErrorVars:
     Serial.print("Fehler bei der Variablendeklaration");
     break;
-  case ERROR_TIME1234:
+  case ErrorTime:
     Serial.print("Fehler bei der Zeiteinstellung");
     break;
   default:
@@ -145,15 +145,15 @@ void setup() {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   
   // 20 = max 10 sek warten
-  for(u32_t i = 0, error_state = ERROR_WLAN1234; i < 20; i++) {
+  for(u32_t i = 0, error_state = ErrorWIFI; i < 20; i++) {
     if(WiFi.status() == WL_CONNECTED) {
-      error_state = ERROR_OK1234;
+      error_state = ErrorOK;
       break;
     }
     delay(500);
     Serial.print(".");
   }
-  if(error_state != ERROR_OK1234) {
+  if(error_state != ErrorOK) {
     return;
   }
 
@@ -182,7 +182,7 @@ void setup() {
   menuManager = new MenuManager({mainMenu, tempMenu, flowMenu, sensorMenu, functionMenu, relayMenu, testMenu, hiddenMenu});
   if(menuManager == nullptr) {
     Serial.println("MenuManager konnte nicht initialisiert werden");
-    error_state = ERROR_VARS1234;
+    error_state = ErrorVars;
     return;
   }
 
@@ -202,7 +202,7 @@ void loop() {
   // printMemoryUsage();
   if (!getLocalTime(&timeinfo)) {
     Serial.println("Failed to obtain time");
-    error_state = ERROR_TIME1234;
+    error_state = ErrorTime;
     return;
   }
   state->hourOfDay = timeinfo.tm_hour;

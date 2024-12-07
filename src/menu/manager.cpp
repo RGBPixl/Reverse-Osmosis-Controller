@@ -13,7 +13,7 @@ MenuManager::MenuManager(std::initializer_list<MenuEntry> menus)
     this->entries.push_back(menu);
 
   if (&lcd == nullptr || &state == nullptr) {
-    error_state = ERROR_VARS1234;
+    error_state = ErrorVars;
   }
 }
 
