@@ -16,6 +16,8 @@ public: // constructor
     , flowImpulseCount(0)
     , testState(0)
    {};
+  
+  inline ~State() { Serial.print("State destroyed"); };
 
 public: // variables
   bool flushMembrane;
@@ -43,6 +45,4 @@ public: // volatile = Do not optimize this away!
   volatile bool okPressed = false;
   volatile bool lPressed = false;
   volatile bool rPressed = false;
-
-
 };
