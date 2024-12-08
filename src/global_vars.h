@@ -11,6 +11,6 @@
 #include <math.h>
 #include <time.h>
 
-extern LiquidCrystal_I2C lcd;
+extern LiquidCrystal_I2C *lcd;
 extern State *state;
 extern ErrorType error_state;
