@@ -1,630 +1,246 @@
-//FastLED Warnung ignorieren
-#define FASTLED_INTERNAL
-
+#include "error_handling.h"
+#include "led.h"
+#include "menu/entry.h"
+#include "menu/manager.h"
+#include "menu/page.h"
+#include "relais.h"
+#include "secrets.h"
+#include "state.h"
 #include <Arduino.h>
-#include <Wire.h>
+#include <DallasTemperature.h>
 #include <LiquidCrystal_I2C.h>
 #include <OneWire.h>
-#include <DallasTemperature.h>
-#include <FastLED.h>
-#include <WiFi.h>
-#include <time.h>
 #include <Preferences.h>
-#include "secrets.h"
-#include "classes.h"
+#include <WiFi.h>
+#include <Wire.h>
+#include <math.h>
+#include <time.h>
 
 #define ONE_WIRE_BUS 4
-#define LED_PIN 23
-#define LED_COUNT 8
-#define statusLED_red 18
-#define statusLED_green 19
-#define statusLED_blue 14
-#define button_l 15
-#define button_ok 2
-#define button_r 0
-#define floatSensor 36
+#define STATUS_LED_RED 18
+#define STATUS_LED_GREEN 19
+#define STATUS_LED_BLUE 14
+#define BUTTON_OK 2
+#define BUTTON_L 15
+#define BUTTON_R 0
+#define FLOW_SENSOR 34
+#define FLOAT_SENSOR 36
 
-Relais relais_1(12);
-Relais relais_2(27);
-Relais relais_3(26);
-Relais relais_4(25);
-Relais relais_5(33);
-Relais relais_6(32);
+#define NTP_SERVER "pool.ntp.org"
+#define GMT_OFFSET_SEC 3600
+#define DAYLIGHT_OFFSET_SEC 3600
 
-enum LedState { staticRed,
-                spinningRed,
-                staticRainbow,
-                staticGreen,
-                staticBlue,
-                spinningBlue,
-                spinningRainbow };
+Relais *relais[6]; 
 
-enum MenuePage { pageTemp,
-                 pageFlow,
-                 pageSensor,
-                 pageFunction,
-                 pageRelayStatus,
-                 pageTest,
-                 pageTemp1,
-                 pageTemp2,
-                 pageWaterTotal,
-                 pageSensorStatus,
-                 pageOverflowSensor,
-                 pageSensor5,
-                 pageSensor6,
-                 pageDisinfection,
-                 pageFlushMembrane,
-                 pageFlushSystem,
-                 pageFillContainer,
-                 pageFactoryReset,
-                 pageRelay1,
-                 pageRelay2,
-                 pageRelay3,
-                 pageRelay4,
-                 pageRelay5,
-                 pageRelay6,
-                 pageLedRingTest,
-                 pageResetConfirm,
-                 pageResetSuccess,
-                 nullPage };
+DallasTemperature *sensors; 
+LiquidCrystal_I2C *lcd;
 
-MenuePage MenueArray[8][6] = { { pageTemp, pageFlow, pageSensor, pageFunction, pageRelayStatus, pageTest },                              //Hauptmenü
-                               { pageTemp1, pageTemp2, nullPage, nullPage, nullPage, nullPage },                                         //Temp Menü
-                               { pageWaterTotal, pageSensorStatus, nullPage, nullPage, nullPage, nullPage },                             //Flow Menü
-                               { pageOverflowSensor, pageSensor5, pageSensor6, nullPage, nullPage, nullPage },                           //Sensor Menü
-                               { pageDisinfection, pageFlushMembrane, pageFlushSystem, pageFillContainer, pageFactoryReset, nullPage },  //Function Menü
-                               { pageRelay1, pageRelay2, pageRelay3, pageRelay4, pageRelay5, pageRelay6 },                               //Relay Menü
-                               { pageLedRingTest, nullPage, nullPage, nullPage, nullPage, nullPage },                                    //Test Menü
-                               { pageResetConfirm, pageResetSuccess, nullPage, nullPage, nullPage, nullPage } };                         //Hidden Menues
-int currentMenu;
-int currentPage;
-int currentLedTest = 0;
-int currentResetState = 0;
-String shortStatus = "BOOT"; //max. 8 Zeichen
-
-int flowImpulseCount = 0;
-float flowLiters;
-bool fillContainer = false;
-bool flushMembrane = false;
-bool flushSystem = false;
-
-int hourOfDay;
-
-int testState = 0;
-bool menueOpen = false;
-double Temp1;
-double Temp2;
-
-unsigned long startMillisIdle;
-unsigned long currentMillisIdle;
-
-OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature sensors(&oneWire);
-
-LedState curState = spinningRed;
-//int curMPage;
-
-LiquidCrystal_I2C lcd(0x27, 16, 2);
-CRGB leds[LED_COUNT];
-
-volatile bool okPressed = false;
-volatile bool lPressed = false;
-volatile bool rPressed = false;
-
-TaskHandle_t TaskHandle_1;
-
-void IRAM_ATTR handleButtonPressOK() {
-  okPressed = true;
-}
-void IRAM_ATTR handleButtonPressL() {
-  lPressed = true;
-}
-void IRAM_ATTR handleButtonPressR() {
-  rPressed = true;
-}
-void IRAM_ATTR handleFlowImpulse() {
-  flowImpulseCount++;
-}
-
-const char* ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 3600;
-const int daylightOffset_sec = 3600;
+State *state;
+MenuManager *menuManager;
+ErrorType error_state = ErrorOK;
 
 struct tm timeinfo;
 
-Preferences preferences;
-int intervallFlushSystem;
-int intervallFlushMembrane;
 
-//Funktionsdeklarationen
-void getTime();
-void taskOne(void *);
+// Funktionsdeklarationen
+void IRAM_ATTR handleButtonPressOK(){ state->okPressed = true; }
+void IRAM_ATTR handleButtonPressL() { state->lPressed = true; }
+void IRAM_ATTR handleButtonPressR() { state->rPressed = true; }
+void IRAM_ATTR handleFlowImpulse()  { state->flowImpulseCount++; }
+
 void taskScheduleManager(void *);
-void taskMenue(void *);
+void setup();
+void loop();
 
+int main(int argc, char **argv){
+  setup();
 
-void setup() {
-
-  Serial.begin(9600);
-
-  pinMode(34, INPUT);
-  pinMode(statusLED_red, OUTPUT);
-  pinMode(statusLED_green, OUTPUT);
-  pinMode(statusLED_blue, OUTPUT);
-
-  pinMode(button_l, INPUT_PULLUP);
-  pinMode(button_ok, INPUT_PULLUP);
-  pinMode(button_r, INPUT_PULLUP);
-
-  pinMode(floatSensor, INPUT);
-
-  //Config aus NVS Speicher auslesen
-  if (!preferences.begin("Config", true)) {
-    Serial.println("Failed to initialize NVS");
-    //return;
+  while(true && error_state == ErrorOK) {
+    loop();
   }
 
-  intervallFlushSystem = preferences.getInt("iFlushSystem", 0);
-  intervallFlushMembrane = preferences.getInt("iFlushMembrane", 0);
-  preferences.end();
+  switch (error_state) {
+  case ErrorOK:
+    break;
+  case ErrorWIFI:
+    Serial.print("keine WLAN Verbindung");
+    break;
+  case ErrorVars:
+    Serial.print("Fehler bei der Variablendeklaration");
+    break;
+  case ErrorTime:
+    Serial.print("Fehler bei der Zeiteinstellung");
+    break;
+  default:
+    break;
+  }
 
-  attachInterrupt(digitalPinToInterrupt(button_ok), handleButtonPressOK, FALLING);
-  attachInterrupt(digitalPinToInterrupt(button_l), handleButtonPressL, FALLING);
-  attachInterrupt(digitalPinToInterrupt(button_r), handleButtonPressR, FALLING);
-  attachInterrupt(digitalPinToInterrupt(34), handleFlowImpulse, FALLING);
+  delete(state);
+  delete(lcd);
+  delete(menuManager);
+  delete(sensors);
+  for(Relais *r : relais) {
+    delete(r);
+  }
+}
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(FLOW_SENSOR, INPUT);
+  pinMode(STATUS_LED_RED, OUTPUT);
+  pinMode(STATUS_LED_GREEN, OUTPUT);
+  pinMode(STATUS_LED_BLUE, OUTPUT);
+
+  pinMode(BUTTON_L, INPUT_PULLUP);
+  pinMode(BUTTON_OK, INPUT_PULLUP);
+  pinMode(BUTTON_R, INPUT_PULLUP);
+
+  pinMode(FLOAT_SENSOR, INPUT);
+
+  relais[0] = new Relais(12);
+  relais[1] = new Relais(27);
+  relais[2] = new Relais(26);
+  relais[3] = new Relais(25);
+  relais[4] = new Relais(33);
+  relais[5] = new Relais(32);
+
+  OneWire oneWire(ONE_WIRE_BUS);
+  sensors = new DallasTemperature(&oneWire);
+
+  state = new State();
+  // Config aus NVS Speicher auslesen
+  if (!state->preferences.begin("Config", true)) {
+    Serial.println("Failed to initialize NVS");
+  }
+
+  state->intervallFlushSystem = state->preferences.getInt("iFlushSystem", 0);
+  state->intervallFlushMembrane = state->preferences.getInt("iFlushMembrane", 0);
+  state->preferences.end();
+
+  attachInterrupt(digitalPinToInterrupt(BUTTON_OK), handleButtonPressOK, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_L), handleButtonPressL, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_R), handleButtonPressR, FALLING);
+  attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR), handleFlowImpulse, FALLING);
 
   Serial.println("Starting WiFi...");
   // Connect to Wi-Fi
   Serial.print("Connecting to ");
   Serial.println(WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
+  
+  // 20 = max 10 sek warten
+  for(u32_t i = 0, error_state = ErrorWIFI; i < 20; i++) {
+    if(WiFi.status() == WL_CONNECTED) {
+      error_state = ErrorOK;
+      break;
+    }
     delay(500);
     Serial.print(".");
   }
-  Serial.println("");
-  Serial.println("WiFi connected.");
-
-  // Init
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-
-  // Init Temp Sensors
-  sensors.begin();
-
-  //Init Display
-  lcd.init();
-  lcd.backlight();
-
-  //Init LED-Ring
-  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, LED_COUNT);
-  FastLED.setBrightness(30);
-
-  //Get Time from NTP Server
-  getTime();
-
-  //Create Threads
-  xTaskCreate(taskOne, "taskOne", 10000, &curState, 1, NULL);
-  xTaskCreate(taskScheduleManager, "taskScheduleManager", 10000, NULL, 1, NULL);
-
-  shortStatus = "OK";
-}
-
-void getTime() {
-
-  if (!getLocalTime(&timeinfo)) {
-    Serial.println("Failed to obtain time");
+  if(error_state != ErrorOK) {
     return;
   }
+
+
+  Serial.println("\nWiFi connected.");
+
+  // Init
+  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
+
+  // Init Temp Sensors
+  sensors->begin();
+
+  lcd = new LiquidCrystal_I2C(0x27, 16, 2);
+  // Init Display
+  lcd->init();
+  lcd->backlight();
+
+  // Init LED-Ring
+  setupLeds();
+
+  // Get Time from NTP Server
+  if (!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to obtain time");
+    exit(-1);
+  }
+
+  MenuPage mainPages[] = {MenuPage::temp, MenuPage::flow, MenuPage::sensor, 
+                    MenuPage::function, MenuPage::relayStatus, MenuPage::test};
+  MenuPage tempPages[] = {MenuPage::temp1, MenuPage::temp2};
+  MenuPage flowPages[] = {MenuPage::waterTotal, MenuPage::sensorStatus};
+  MenuPage sensorPages[] = {MenuPage::overflowSensor, MenuPage::sensor5,
+                        MenuPage::sensor6};
+  MenuPage functionPages[] = {MenuPage::disinfection, MenuPage::flushMembrane,
+                          MenuPage::flushSystem, MenuPage::fillContainer,
+                          MenuPage::factoryReset};
+  MenuPage relayPages[] = {MenuPage::relay1, MenuPage::relay2, MenuPage::relay3,
+                       MenuPage::relay4, MenuPage::relay5, MenuPage::relay6};
+  MenuPage testPages[] = {MenuPage::ledRingTest};
+  MenuPage hiddenPages[] = {MenuPage::resetConfirm, MenuPage::resetSuccess};
+
+  MenuEntry mainMenu(mainPages, ARRAY_SIZE(mainPages));
+  MenuEntry tempMenu(tempPages, ARRAY_SIZE(tempPages));
+  MenuEntry flowMenu(flowPages, ARRAY_SIZE(flowPages));
+  MenuEntry sensorMenu(sensorPages, ARRAY_SIZE(sensorPages));
+  MenuEntry functionMenu(functionPages, ARRAY_SIZE(functionPages));
+  MenuEntry relayMenu(relayPages, ARRAY_SIZE(relayPages));
+  MenuEntry testMenu(testPages, ARRAY_SIZE(testPages));
+  MenuEntry hiddenMenu(hiddenPages, ARRAY_SIZE(hiddenPages));
+
+  MenuEntry entries[] = {mainMenu, tempMenu, flowMenu, sensorMenu, functionMenu, relayMenu, testMenu, hiddenMenu};
+  menuManager = new MenuManager(entries, ARRAY_SIZE(entries));
+  if(menuManager == nullptr) {
+    Serial.println("MenuManager konnte nicht initialisiert werden");
+    error_state = ErrorVars;
+    return;
+  }
+
+  // Create Threads
+  xTaskCreate(ledTask, "taskOne", 10000, &state->ledState, 1, NULL);
+  xTaskCreate(taskScheduleManager, "taskScheduleManager", 10000, NULL, 1, NULL);
+
+  sprintf(state->shortStatus, "OK");
 }
 
 void loop() {
 
-  if (okPressed){
+  if (state->okPressed) {
     Serial.println("DEBUG: OK gedrückt!");
   }
 
-  //printMemoryUsage();
-  getTime();
-  hourOfDay = timeinfo.tm_hour;
+  // printMemoryUsage();
+  if (!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to obtain time");
+    error_state = ErrorTime;
+    return;
+  }
+  state->hourOfDay = timeinfo.tm_hour;
 
-  if (okPressed && !menueOpen) {
-    menueOpen = true;
-    xTaskCreate(taskMenue, "taskMenue", 10000, NULL, 1, &TaskHandle_1);
-    okPressed = false;
+  if (state->okPressed && !menuManager->openState()) {
+    menuManager->open();
+    state->okPressed = false;
   }
 
-  flowLiters = round((flowImpulseCount * 0.00052) * 100.0) / 100.0;
+  state->flowLiters = round((state->flowImpulseCount * 0.00052) * 100.0) / 100.0;
 
-  if (!menueOpen) {
-    lcd.setCursor(0, 0);
-    lcd.print("Status: " + shortStatus);
-    lcd.setCursor(0, 1);
-    lcd.print("Wasser: " + String(flowLiters) + "L");
-    if (shortStatus.length() < 3) {
-      lcd.setCursor(11, 0);
-      lcd.print(&timeinfo, "%R");
+  if (!menuManager->openState()) {
+    lcd->setCursor(0, 0);
+    lcd->printf("Status: %s", *state->shortStatus);
+    lcd->setCursor(0, 1);
+    lcd->printf("Wasser: %.2fL", state->flowLiters);
+    if (ARRAY_SIZE(state->shortStatus) < 3) {
+      lcd->setCursor(11, 0);
+      lcd->print(&timeinfo, "%R");
     }
   }
 
-  sensors.requestTemperatures();
-  Temp1 = sensors.getTempCByIndex(0);
-  Temp2 = sensors.getTempCByIndex(1);
+  sensors->requestTemperatures();
+  state->temp1 = sensors->getTempCByIndex(0);
+  state->temp2 = sensors->getTempCByIndex(1);
 
   delay(500);
 }
-
-void taskMenue(void *parameter) {
-
-  startMillisIdle = millis();
-  currentMenu = 0;
-  currentPage = 0;
-  lcd.clear();
-
-  while(true){
-    if(rPressed){
-      startMillisIdle = millis();
-      currentPage++;
-      if (MenueArray[currentMenu][currentPage] == nullPage || currentPage == 6){
-        currentPage = 0;
-      }
-      lcd.clear();
-      rPressed = false;
-    }
-
-    if(lPressed){
-      startMillisIdle = millis();
-      currentPage = currentMenu -1;
-      if (currentPage == -1){
-        lPressed = false;
-        break;
-      }
-      currentMenu = 0;
-      currentResetState = 0;
-      lcd.clear();
-      lPressed = false;
-    }
-
-    if(okPressed){
-      startMillisIdle = millis();
-      lcd.clear();
-      okPressed = false;
-
-      if (currentMenu == 6 && currentPage == 0){
-        currentLedTest++;
-        if (currentLedTest > 6){
-          currentLedTest = 0;
-        }
-        curState = (LedState)currentLedTest;
-      }
-  
-      //Fill Container
-      if (currentMenu == 4 && currentPage == 3){
-        fillContainer = true;
-      }
-
-      //Flush Membrane
-      if (currentMenu == 4 && currentPage == 1){
-        flushMembrane = true;
-      }
-
-      //Flush System
-      if (currentMenu == 4 && currentPage == 2){
-        flushSystem = true;
-      }
-
-      //Factory Reset
-      if ((currentMenu == 4 && currentPage == 4) || (currentMenu == 7 && currentPage == 0)){
-        currentResetState++;
-        switch (currentResetState) {
-          
-          case 0:
-            lcd.setCursor(0, 0);
-            lcd.print("ERROR");
-            delay(2000);
-            break;
-
-          case 1:
-            currentMenu = 7;
-            currentPage = 0;
-            break;
-
-          case 2:
-
-            if (!preferences.begin("Config", false)) {
-              Serial.println("Failed to initialize NVS");
-            return;
-            }
-            preferences.putInt("iFlushSystem", 8);     //Default alle 8 Stunden
-            intervallFlushSystem = 8;
-            preferences.putInt("iFlushMembrane", 24);  //Default alle 24 Stunden
-            intervallFlushMembrane = 24;
-            preferences.end();
-            currentResetState = 0;
-
-            currentMenu = 7;
-            currentPage = 1;
-            break;
-          }
-        }
-        if (currentMenu == 0){
-          currentMenu = currentPage +1;
-          currentPage = 0;
-        }
-      }
-
-    switch((MenuePage)MenueArray[currentMenu][currentPage]){
-
-      case pageTemp:
-        lcd.setCursor(0, 0);
-        lcd.print("Temperaturen");
-        lcd.setCursor(0, 1);
-        lcd.print("              ->");
-        break;
-
-      case pageFlow:
-        lcd.setCursor(0, 0);
-        lcd.print("Durchfluss");
-        lcd.setCursor(0, 1);
-        lcd.print("              ->");
-        break;
-
-      case pageSensor:
-        lcd.setCursor(0, 0);
-        lcd.print("Sonst. Sensoren");
-        lcd.setCursor(0, 1);
-        lcd.print("              ->");
-        break;
-
-      case pageFunction:
-        lcd.setCursor(0, 0);
-        lcd.print("Funktionen");
-        lcd.setCursor(0, 1);
-        lcd.print("              ->");
-        break;
-
-      case pageRelayStatus:
-        lcd.setCursor(0, 0);
-        lcd.print("Status Relais");
-        lcd.setCursor(0, 1);
-        lcd.print("              ->");
-        break;
-
-      case pageTest:
-        lcd.setCursor(0, 0);
-        lcd.print("Test");
-        lcd.setCursor(0, 1);
-        lcd.print("              ->");
-        break;
-
-      case pageTemp1:
-        lcd.setCursor(0, 0);
-        lcd.print("Vor Filter Temp");
-        lcd.setCursor(0, 1);
-        lcd.print(String(Temp1) + " \xDF" "C");
-        break;
-
-      case pageTemp2:
-        lcd.setCursor(0, 0);
-        lcd.print("Nach Filter Temp");
-        lcd.setCursor(0, 1);
-        lcd.print(String(Temp2) + " \xDF" "C");
-        break;
-
-      case pageWaterTotal:
-        lcd.setCursor(0, 0);
-        lcd.print("Wasser Total:");
-        lcd.setCursor(0, 1);
-        lcd.print("9999 L");
-        break;
-
-      case pageSensorStatus:
-        lcd.setCursor(0, 0);
-        lcd.print("Flow Sensor RAW:");
-        lcd.setCursor(0, 1);
-        lcd.print("23 IMP/M");
-        break;
-
-      case pageOverflowSensor:
-        lcd.setCursor(0, 0);
-        lcd.print("Overflow Sensor");
-        lcd.setCursor(0, 1);
-        lcd.print("offen");
-        break;
-
-      case pageSensor5:
-        lcd.setCursor(0, 0);
-        lcd.print("Dummy Sensor 1");
-        lcd.setCursor(0, 1);
-        lcd.print("offen");
-        break;
-
-      case pageSensor6:
-        lcd.setCursor(0, 0);
-        lcd.print("Dummy Sensor 2");
-        lcd.setCursor(0, 1);
-        lcd.print("offen");
-        break;
-
-      case pageDisinfection:
-        lcd.setCursor(0, 0);
-        lcd.print("Desinfektion");
-        lcd.setCursor(0, 1);
-        lcd.print("--> Starten <--");
-        break;
-
-      case pageFlushMembrane:
-        lcd.setCursor(0, 0);
-        lcd.print("Membran Sp" "\xF5" "len");
-        lcd.setCursor(0, 1);
-        lcd.print("--> Starten <--");
-        break;
-
-      case pageFlushSystem:
-        lcd.setCursor(0, 0);
-        lcd.print("System Sp" "\xF5" "len");
-        lcd.setCursor(0, 1);
-        lcd.print("--> Starten <--");
-        break;
-
-      case pageFillContainer:
-        lcd.setCursor(0, 0);
-        lcd.print("Kanister f" "\xF5" "llen");
-        lcd.setCursor(0, 1);
-        lcd.print("--> Starten <--");
-        break;
-
-      case pageRelay1:
-        lcd.setCursor(0, 0);
-        lcd.print("Relais Zulauf");
-        lcd.setCursor(0, 1);
-        lcd.print("offen");
-        break;
-
-      case pageRelay2:
-        lcd.setCursor(0, 0);
-        lcd.print("Relais Membran");
-        lcd.setCursor(0, 1);
-        lcd.print("offen");
-        break;
-
-      case pageRelay3:
-        lcd.setCursor(0, 0);
-        lcd.print("Relais Abfluss");
-        lcd.setCursor(0, 1);
-        lcd.print("offen");
-        break;
-
-      case pageRelay4:
-        lcd.setCursor(0, 0);
-        lcd.print("Relais Kanister");
-        lcd.setCursor(0, 1);
-        lcd.print("offen");
-        break;
-
-      case pageRelay5:
-        lcd.setCursor(0, 0);
-        lcd.print("Dummy R5");
-        lcd.setCursor(0, 1);
-        lcd.print("offen");
-        break;
-
-      case pageRelay6:
-        lcd.setCursor(0, 0);
-        lcd.print("Dummy R6");
-        lcd.setCursor(0, 1);
-        lcd.print("offen");
-        break;
-
-      case pageLedRingTest:
-        lcd.setCursor(0, 0);
-        lcd.print("Test LED Ring");
-        lcd.setCursor(0, 1);
-        lcd.print("Status: " + String(currentLedTest));
-        break;
-
-      case pageFactoryReset:
-        lcd.setCursor(0, 0);
-        lcd.print("Factory Reset");
-        lcd.setCursor(0, 1);
-        lcd.print("---> RESET <---");
-        break;  
-
-      case pageResetConfirm:
-        lcd.setCursor(0, 0);
-        lcd.print("RESET");
-        lcd.setCursor(0, 1);
-        lcd.print("bestaetigen");
-        break;
-
-      case pageResetSuccess:
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("RESET");
-        lcd.setCursor(0, 1);
-        lcd.print("erfolgreich...");
-        break; 
-
-      default:
-        lcd.setCursor(0, 0);
-        lcd.print("ERROR 404");
-        lcd.setCursor(0, 1);
-        lcd.print("M:" + String(currentMenu) + " P:" + String(currentPage));
-        break; 
-    }
-
-    currentMillisIdle = millis();
-    if (currentMillisIdle - startMillisIdle >= 10000) {
-      break;
-    } 
-    delay(500);
-    vTaskDelay(1);
-  }
-
-  lcd.clear();
-  currentResetState = 0;
-  menueOpen = false;
-  vTaskDelete(NULL);
-}
-
-void taskOne(void *parameter) {
-  LedState *state;
-  state = (LedState*)parameter;
-
-  while (true) {
-    
-    switch (*state) {
-
-      case staticRed:
-        fill_solid(leds, LED_COUNT, CRGB::Red);
-        FastLED.show();
-        break;
-
-      case spinningRed:
-        for (int i = 0; i<LED_COUNT; i++){
-          fadeToBlackBy(leds, LED_COUNT, 100);
-          leds[i] = CRGB::Red;
-          FastLED.show();
-          delay(100);
-        }
-        break;
-
-      case staticRainbow:
-        fill_rainbow(leds, LED_COUNT, 0, 32);
-        FastLED.show();
-        break;
-
-      case staticGreen:
-        fill_solid(leds, LED_COUNT, CRGB::Green);
-        FastLED.show();
-        break;
-
-      case staticBlue:
-        fill_solid(leds, LED_COUNT, CRGB::Blue);
-        FastLED.show();
-        break;
-
-      case spinningBlue:
-        for (int i = 0; i<LED_COUNT; i++){
-          fadeToBlackBy(leds, LED_COUNT, 100);
-          leds[i] = CRGB::Blue;
-          FastLED.show();
-          delay(100);
-        }
-        break;
-
-     case spinningRainbow:
-      for (int i = LED_COUNT-1; i>=0; i--){
-        fill_rainbow(leds, LED_COUNT, i*32, 32);
-        FastLED.show();
-        delay(100);
-      }
-        break;     	
-    }
-
-    vTaskDelay(1);  // Leichtes Yielding, um den Watchdog nicht zu triggern
-  }
-}
-
 
 void taskScheduleManager(void *parameter) {
   unsigned long startMillisFlush;
@@ -634,65 +250,64 @@ void taskScheduleManager(void *parameter) {
   while (true) {
 
     if (startup) {
-      relais_1.turnOn();  //Frischwasserzulauf auf
+      relais[0]->turnOn(); // Frischwasserzulauf auf
       delay(500);
-      relais_2.turnOn();   //Abwasserventil auf
-      delay(2000);         //300000 = 5m
-      relais_3.turnOn();   //Membran-Bypass auf
-      delay(2000);         //300000 = 5m
-      relais_3.turnOff();  //Membran-Bypass zu
-      relais_2.turnOff();  //Abwasserventil zu
+      relais[1]->turnOn();  // Abwasserventil auf
+      delay(2000);        // 300000 = 5m
+      relais[2]->turnOn();  // Membran-Bypass auf
+      delay(2000);        // 300000 = 5m
+      relais[2]->turnOff(); // Membran-Bypass zu
+      relais[1]->turnOff(); // Abwasserventil zu
       startup = false;
       startMillisFlush = millis();
     }
 
-    //Alle x Stunden das System spülen
+    // Alle x Stunden das System spülen
     currentMillisFlush = millis();
-    if (currentMillisFlush - startMillisFlush >= (intervallFlushSystem * 3600000)) {
-      relais_2.turnOn();  //Abwasserventil auf
+    if (currentMillisFlush - startMillisFlush >=
+        (state->intervallFlushSystem * 3600000)) {
+      relais[1]->turnOn(); // Abwasserventil auf
       delay(300000);
-      relais_2.turnOff();  //Abwasserventil zu
+      relais[1]->turnOff(); // Abwasserventil zu
       startMillisFlush = millis();
     }
 
-    if (fillContainer) {
-      relais_4.turnOn();
+    if (state->fillContainer) {
+      relais[3]->turnOn();
       while (true) {
         delay(500);
-        if (digitalRead(floatSensor)) {
-          relais_4.turnOff();
-          fillContainer = false;
+        if (digitalRead(FLOAT_SENSOR)) {
+          relais[3]->turnOff();
+          state->fillContainer = false;
           break;
         }
       }
     }
 
-    if (flushMembrane) {
-      shortStatus = "FLUSH M";
-      lcd.clear();
-      menueOpen = false;
-      vTaskDelete(TaskHandle_1);
-      relais_2.turnOn();   //Abwasserventil auf
-      relais_3.turnOn();   //Membran-Bypass auf
-      delay(5000);         //300000 = 5m
-      relais_3.turnOff();  //Membran-Bypass zu
-      relais_2.turnOff();  //Abwasserventil zu
-      flushMembrane = false;
-      shortStatus = "OK";
-      lcd.clear();
+    if (state->flushMembrane) {
+      sprintf(state->shortStatus, "FLUSH M");
+      lcd->clear();
+      menuManager->close();
+      relais[1]->turnOn();  // Abwasserventil auf
+      relais[2]->turnOn();  // Membran-Bypass auf
+      delay(5000);        // 300000 = 5m
+      relais[2]->turnOff(); // Membran-Bypass zu
+      relais[1]->turnOff(); // Abwasserventil zu
+      state->flushMembrane = false;
+      sprintf(state->shortStatus, "OK");
+      lcd->clear();
     }
 
-    if (flushSystem) {
-      shortStatus = "FLUSH S";
-      lcd.clear();
-      menueOpen = false;
-      vTaskDelete(TaskHandle_1);
-      relais_2.turnOn();   //Abwasserventil auf
-      delay(5000);         //300000 = 5m
-      relais_2.turnOff();  //Abwasserventil zu
-      flushSystem = false;
-      shortStatus = "OK";
-      lcd.clear();
+    if (state->flushSystem) {
+      sprintf(state->shortStatus, "FLUSH S");
+      lcd->clear();
+      menuManager->close();
+      relais[1]->turnOn();  // Abwasserventil auf
+      delay(5000);        // 300000 = 5m
+      relais[1]->turnOff(); // Abwasserventil zu
+      state->flushSystem = false;
+      sprintf(state->shortStatus, "OK");
+      lcd->clear();
     }
 
     delay(500);
