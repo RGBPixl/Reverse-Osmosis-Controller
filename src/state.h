@@ -3,6 +3,9 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
+#ifndef ARRAY_SIZE
+  #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
+#endif
 class State {
 public: // constructor
   inline State() : 

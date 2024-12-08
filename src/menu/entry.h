@@ -9,7 +9,7 @@ private:
   int currentPage;
 
 public:
-  MenuEntry(std::initializer_list<MenuPage> pages);
+  MenuEntry(MenuPage pages[], int countPages);
 
 public:
   inline void next() { currentPage = currentPage < pages.size() - 1 ? currentPage++ : 0; };

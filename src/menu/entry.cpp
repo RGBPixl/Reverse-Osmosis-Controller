@@ -2,8 +2,12 @@
 #include "page.h"
 #include <Arduino.h>
 
-MenuEntry::MenuEntry(std::initializer_list<MenuPage> pages) : currentPage(0) {
-  for (MenuPage page : pages) {
-    this->pages.push_back(page);
+#ifndef ARRAY_SIZE
+  #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
+#endif
+
+MenuEntry::MenuEntry(MenuPage menupages[], int countPages) : currentPage(0) {
+  for(int i = 0; i < countPages; i++) {
+    pages.push_back(menupages[i]);
   }
 }
