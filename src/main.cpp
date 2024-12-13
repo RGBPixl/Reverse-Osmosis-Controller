@@ -30,36 +30,17 @@
 #define GMT_OFFSET_SEC 3600
 #define DAYLIGHT_OFFSET_SEC 3600
 
-#define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
+Relais *relais[6]; 
 
-Relais *relais[6]; // = {Relais(12), Relais(27), Relais(26), Relais(25), Relais(33), Relais(32)};
-
-MenuEntry mainMenu({MenuPage::temp, MenuPage::flow, MenuPage::sensor, 
-                    MenuPage::function, MenuPage::relayStatus, MenuPage::test});
-MenuEntry tempMenu({MenuPage::temp1, MenuPage::temp2});
-MenuEntry flowMenu({MenuPage::waterTotal, MenuPage::sensorStatus});
-MenuEntry sensorMenu({MenuPage::overflowSensor, MenuPage::sensor5,
-                      MenuPage::sensor6});
-MenuEntry functionMenu({MenuPage::disinfection, MenuPage::flushMembrane,
-                        MenuPage::flushSystem, MenuPage::fillContainer,
-                        MenuPage::factoryReset});
-MenuEntry relayMenu({MenuPage::relay1, MenuPage::relay2, MenuPage::relay3,
-                     MenuPage::relay4, MenuPage::relay5, MenuPage::relay6});
-MenuEntry testMenu({MenuPage::ledRingTest});
-MenuEntry hiddenMenu({MenuPage::resetConfirm, MenuPage::resetSuccess});
-
-OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature sensors(&oneWire);
-
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+DallasTemperature *sensors; 
+LiquidCrystal_I2C *lcd;
 
 State *state;
-
 MenuManager *menuManager;
+ErrorType error_state = ErrorOK;
 
 struct tm timeinfo;
 
-ErrorType error_state = ErrorOK;
 
 // Funktionsdeklarationen
 void IRAM_ATTR handleButtonPressOK(){ state->okPressed = true; }
@@ -95,7 +76,9 @@ int main(int argc, char **argv){
   }
 
   delete(state);
+  delete(lcd);
   delete(menuManager);
+  delete(sensors);
   for(Relais *r : relais) {
     delete(r);
   }
@@ -122,8 +105,10 @@ void setup() {
   relais[4] = new Relais(33);
   relais[5] = new Relais(32);
 
-  state = new State();
+  OneWire oneWire(ONE_WIRE_BUS);
+  sensors = new DallasTemperature(&oneWire);
 
+  state = new State();
   // Config aus NVS Speicher auslesen
   if (!state->preferences.begin("Config", true)) {
     Serial.println("Failed to initialize NVS");
@@ -164,11 +149,12 @@ void setup() {
   configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
 
   // Init Temp Sensors
-  sensors.begin();
+  sensors->begin();
 
+  lcd = new LiquidCrystal_I2C(0x27, 16, 2);
   // Init Display
-  lcd.init();
-  lcd.backlight();
+  lcd->init();
+  lcd->backlight();
 
   // Init LED-Ring
   setupLeds();
@@ -179,7 +165,31 @@ void setup() {
     exit(-1);
   }
 
-  menuManager = new MenuManager({mainMenu, tempMenu, flowMenu, sensorMenu, functionMenu, relayMenu, testMenu, hiddenMenu});
+  MenuPage mainPages[] = {MenuPage::temp, MenuPage::flow, MenuPage::sensor, 
+                    MenuPage::function, MenuPage::relayStatus, MenuPage::test};
+  MenuPage tempPages[] = {MenuPage::temp1, MenuPage::temp2};
+  MenuPage flowPages[] = {MenuPage::waterTotal, MenuPage::sensorStatus};
+  MenuPage sensorPages[] = {MenuPage::overflowSensor, MenuPage::sensor5,
+                        MenuPage::sensor6};
+  MenuPage functionPages[] = {MenuPage::disinfection, MenuPage::flushMembrane,
+                          MenuPage::flushSystem, MenuPage::fillContainer,
+                          MenuPage::factoryReset};
+  MenuPage relayPages[] = {MenuPage::relay1, MenuPage::relay2, MenuPage::relay3,
+                       MenuPage::relay4, MenuPage::relay5, MenuPage::relay6};
+  MenuPage testPages[] = {MenuPage::ledRingTest};
+  MenuPage hiddenPages[] = {MenuPage::resetConfirm, MenuPage::resetSuccess};
+
+  MenuEntry mainMenu(mainPages, ARRAY_SIZE(mainPages));
+  MenuEntry tempMenu(tempPages, ARRAY_SIZE(tempPages));
+  MenuEntry flowMenu(flowPages, ARRAY_SIZE(flowPages));
+  MenuEntry sensorMenu(sensorPages, ARRAY_SIZE(sensorPages));
+  MenuEntry functionMenu(functionPages, ARRAY_SIZE(functionPages));
+  MenuEntry relayMenu(relayPages, ARRAY_SIZE(relayPages));
+  MenuEntry testMenu(testPages, ARRAY_SIZE(testPages));
+  MenuEntry hiddenMenu(hiddenPages, ARRAY_SIZE(hiddenPages));
+
+  MenuEntry entries[] = {mainMenu, tempMenu, flowMenu, sensorMenu, functionMenu, relayMenu, testMenu, hiddenMenu};
+  menuManager = new MenuManager(entries, ARRAY_SIZE(entries));
   if(menuManager == nullptr) {
     Serial.println("MenuManager konnte nicht initialisiert werden");
     error_state = ErrorVars;
@@ -190,7 +200,7 @@ void setup() {
   xTaskCreate(ledTask, "taskOne", 10000, &state->ledState, 1, NULL);
   xTaskCreate(taskScheduleManager, "taskScheduleManager", 10000, NULL, 1, NULL);
 
-  sprintf(state->shortStatus, "OK");  
+  sprintf(state->shortStatus, "OK");
 }
 
 void loop() {
@@ -215,19 +225,19 @@ void loop() {
   state->flowLiters = round((state->flowImpulseCount * 0.00052) * 100.0) / 100.0;
 
   if (!menuManager->openState()) {
-    lcd.setCursor(0, 0);
-    lcd.printf("Status: %s", *state->shortStatus);
-    lcd.setCursor(0, 1);
-    lcd.printf("Wasser: %.2fL", state->flowLiters);
+    lcd->setCursor(0, 0);
+    lcd->printf("Status: %s", *state->shortStatus);
+    lcd->setCursor(0, 1);
+    lcd->printf("Wasser: %.2fL", state->flowLiters);
     if (ARRAY_SIZE(state->shortStatus) < 3) {
-      lcd.setCursor(11, 0);
-      lcd.print(&timeinfo, "%R");
+      lcd->setCursor(11, 0);
+      lcd->print(&timeinfo, "%R");
     }
   }
 
-  sensors.requestTemperatures();
-  state->temp1 = sensors.getTempCByIndex(0);
-  state->temp2 = sensors.getTempCByIndex(1);
+  sensors->requestTemperatures();
+  state->temp1 = sensors->getTempCByIndex(0);
+  state->temp2 = sensors->getTempCByIndex(1);
 
   delay(500);
 }
@@ -276,7 +286,7 @@ void taskScheduleManager(void *parameter) {
 
     if (state->flushMembrane) {
       sprintf(state->shortStatus, "FLUSH M");
-      lcd.clear();
+      lcd->clear();
       menuManager->close();
       relais[1]->turnOn();  // Abwasserventil auf
       relais[2]->turnOn();  // Membran-Bypass auf
@@ -285,19 +295,19 @@ void taskScheduleManager(void *parameter) {
       relais[1]->turnOff(); // Abwasserventil zu
       state->flushMembrane = false;
       sprintf(state->shortStatus, "OK");
-      lcd.clear();
+      lcd->clear();
     }
 
     if (state->flushSystem) {
       sprintf(state->shortStatus, "FLUSH S");
-      lcd.clear();
+      lcd->clear();
       menuManager->close();
       relais[1]->turnOn();  // Abwasserventil auf
       delay(5000);        // 300000 = 5m
       relais[1]->turnOff(); // Abwasserventil zu
       state->flushSystem = false;
       sprintf(state->shortStatus, "OK");
-      lcd.clear();
+      lcd->clear();
     }
 
     delay(500);

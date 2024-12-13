@@ -9,7 +9,7 @@
 
 class MenuManager {
 public:
-  MenuManager(std::initializer_list<MenuEntry> menus);
+  MenuManager(MenuEntry menus[], int countMenus);
   inline ~MenuManager() { Serial.print("MenuManager destroyed"); };
 
 private:
