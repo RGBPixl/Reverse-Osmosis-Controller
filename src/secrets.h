@@ -1,4 +1,4 @@
 #pragma once
 
-#define WIFI_SSID "SSID!"
-#define WIFI_PASSWORD "Pass!"
+#define WIFI_SSID "Wokwi-GUEST"
+#define WIFI_PASSWORD ""

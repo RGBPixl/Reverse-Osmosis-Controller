@@ -14,3 +14,4 @@
 extern LiquidCrystal_I2C *lcd;
 extern State *state;
 extern ErrorType error_state;
+extern Preferences preferences;
