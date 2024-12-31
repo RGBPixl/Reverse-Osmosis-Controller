@@ -10,7 +10,6 @@ class State {
 public: // constructor
   inline State() : 
       ledState(LedState::spinningRed)
-    , shortStatus("BOOT")
     , flushMembrane(false) // false & 0 inits eig irrelevant da das die Standardwerte sind, sicherheitshalber trotzdem ;D
     , flushSystem(false)
     , fillContainer(false)
@@ -18,7 +17,9 @@ public: // constructor
     , currentResetState(0)
     , flowImpulseCount(0)
     , testState(0)
-   {};
+   {
+    sprintf(shortStatus, "BOOT");
+   };
   
   inline ~State() { Serial.print("State destroyed"); };
 

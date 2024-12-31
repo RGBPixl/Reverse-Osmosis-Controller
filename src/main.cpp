@@ -6,7 +6,6 @@
 #include "relais.h"
 #include "secrets.h"
 #include "state.h"
-#include <Arduino.h>
 #include <DallasTemperature.h>
 #include <LiquidCrystal_I2C.h>
 #include <OneWire.h>
@@ -15,6 +14,7 @@
 #include <Wire.h>
 #include <math.h>
 #include <time.h>
+#include <vector>
 
 #define ONE_WIRE_BUS 4
 #define STATUS_LED_RED 18
@@ -26,7 +26,7 @@
 #define FLOW_SENSOR 34
 #define FLOAT_SENSOR 36
 
-#define NTP_SERVER "pool.ntp.org"
+#define NTP_SERVER "0.de.pool.ntp.org"
 #define GMT_OFFSET_SEC 3600
 #define DAYLIGHT_OFFSET_SEC 3600
 
@@ -52,12 +52,14 @@ void taskScheduleManager(void *);
 void setup();
 void loop();
 
+
 int main(int argc, char **argv){
   setup();
-
-  while(true && error_state == ErrorOK) {
+  Serial.print("Setup done\n");
+  do {
     loop();
-  }
+  } while(error_state == ErrorOK);
+    
 
   switch (error_state) {
   case ErrorOK:
@@ -82,6 +84,7 @@ int main(int argc, char **argv){
   for(Relais *r : relais) {
     delete(r);
   }
+  return 0;
 }
 
 void setup() {
@@ -142,8 +145,8 @@ void setup() {
     return;
   }
 
-
-  Serial.println("\nWiFi connected.");
+  Serial.print("\r\n");
+  Serial.print("WiFi connected.\n\r");
 
   // Init
   configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
@@ -158,53 +161,40 @@ void setup() {
 
   // Init LED-Ring
   setupLeds();
-
   // Get Time from NTP Server
   if (!getLocalTime(&timeinfo)) {
     Serial.println("Failed to obtain time");
-    exit(-1);
+  //  exit(-1);
   }
 
-  MenuPage mainPages[] = {MenuPage::temp, MenuPage::flow, MenuPage::sensor, 
-                    MenuPage::function, MenuPage::relayStatus, MenuPage::test};
-  MenuPage tempPages[] = {MenuPage::temp1, MenuPage::temp2};
-  MenuPage flowPages[] = {MenuPage::waterTotal, MenuPage::sensorStatus};
-  MenuPage sensorPages[] = {MenuPage::overflowSensor, MenuPage::sensor5,
-                        MenuPage::sensor6};
-  MenuPage functionPages[] = {MenuPage::disinfection, MenuPage::flushMembrane,
-                          MenuPage::flushSystem, MenuPage::fillContainer,
-                          MenuPage::factoryReset};
-  MenuPage relayPages[] = {MenuPage::relay1, MenuPage::relay2, MenuPage::relay3,
-                       MenuPage::relay4, MenuPage::relay5, MenuPage::relay6};
-  MenuPage testPages[] = {MenuPage::ledRingTest};
-  MenuPage hiddenPages[] = {MenuPage::resetConfirm, MenuPage::resetSuccess};
+  MenuEntry mainMenu({MenuPage::temp, MenuPage::flow, MenuPage::sensor, 
+                    MenuPage::function, MenuPage::relayStatus, MenuPage::test});
+  MenuEntry tempMenu({MenuPage::temp1, MenuPage::temp2});
+  MenuEntry flowMenu({MenuPage::waterTotal, MenuPage::sensorStatus});
+  MenuEntry sensorMenu({MenuPage::overflowSensor, MenuPage::sensor5,
+                      MenuPage::sensor6});
+  MenuEntry functionMenu({MenuPage::disinfection, MenuPage::flushMembrane,
+                        MenuPage::flushSystem, MenuPage::fillContainer,
+                        MenuPage::factoryReset});
+  MenuEntry relayMenu({MenuPage::relay1, MenuPage::relay2, MenuPage::relay3,
+                     MenuPage::relay4, MenuPage::relay5, MenuPage::relay6});
+  MenuEntry testMenu({MenuPage::ledRingTest});
+  MenuEntry hiddenMenu({MenuPage::resetConfirm, MenuPage::resetSuccess});
 
-  MenuEntry mainMenu(mainPages, ARRAY_SIZE(mainPages));
-  MenuEntry tempMenu(tempPages, ARRAY_SIZE(tempPages));
-  MenuEntry flowMenu(flowPages, ARRAY_SIZE(flowPages));
-  MenuEntry sensorMenu(sensorPages, ARRAY_SIZE(sensorPages));
-  MenuEntry functionMenu(functionPages, ARRAY_SIZE(functionPages));
-  MenuEntry relayMenu(relayPages, ARRAY_SIZE(relayPages));
-  MenuEntry testMenu(testPages, ARRAY_SIZE(testPages));
-  MenuEntry hiddenMenu(hiddenPages, ARRAY_SIZE(hiddenPages));
-
-  MenuEntry entries[] = {mainMenu, tempMenu, flowMenu, sensorMenu, functionMenu, relayMenu, testMenu, hiddenMenu};
-  menuManager = new MenuManager(entries, ARRAY_SIZE(entries));
+  menuManager = new MenuManager({mainMenu, tempMenu, flowMenu, sensorMenu, functionMenu,
+                         relayMenu, testMenu, hiddenMenu});
   if(menuManager == nullptr) {
     Serial.println("MenuManager konnte nicht initialisiert werden");
     error_state = ErrorVars;
-    return;
+//    return;
   }
-
   // Create Threads
   xTaskCreate(ledTask, "taskOne", 10000, &state->ledState, 1, NULL);
   xTaskCreate(taskScheduleManager, "taskScheduleManager", 10000, NULL, 1, NULL);
-
   sprintf(state->shortStatus, "OK");
 }
 
 void loop() {
-
   if (state->okPressed) {
     Serial.println("DEBUG: OK gedrückt!");
   }
@@ -213,7 +203,7 @@ void loop() {
   if (!getLocalTime(&timeinfo)) {
     Serial.println("Failed to obtain time");
     error_state = ErrorTime;
-    return;
+  //  return;
   }
   state->hourOfDay = timeinfo.tm_hour;
 
@@ -226,19 +216,17 @@ void loop() {
 
   if (!menuManager->openState()) {
     lcd->setCursor(0, 0);
-    lcd->printf("Status: %s", *state->shortStatus);
+    lcd->printf("Status: %s\n", state->shortStatus);
     lcd->setCursor(0, 1);
-    lcd->printf("Wasser: %.2fL", state->flowLiters);
+    lcd->printf("Wasser: %.2fL\n", state->flowLiters);
     if (ARRAY_SIZE(state->shortStatus) < 3) {
       lcd->setCursor(11, 0);
       lcd->print(&timeinfo, "%R");
     }
   }
-
   sensors->requestTemperatures();
   state->temp1 = sensors->getTempCByIndex(0);
   state->temp2 = sensors->getTempCByIndex(1);
-
   delay(500);
 }
 

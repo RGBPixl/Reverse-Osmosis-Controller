@@ -1,6 +1,6 @@
 #pragma once
 
-enum MenuPage : short {
+enum MenuPage : int {
   temp,
   flow,
   sensor,

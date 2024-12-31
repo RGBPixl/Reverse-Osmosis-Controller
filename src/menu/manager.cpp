@@ -7,18 +7,15 @@
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 
-MenuManager::MenuManager(MenuEntry menus[], int countMenus)
+MenuManager::MenuManager(std::initializer_list<MenuEntry> menus)
     : currentMenu(0), startMillisIdle(millis()), currentMillisIdle(millis()), isOpen(false) {
-  for(int i = 0; i < countMenus; i++)
-    entries.push_back(menus[i]);
-
-  if (lcd == nullptr || &state == nullptr) {
-    error_state = ErrorVars;
+  for(MenuEntry e : menus) {
+    entries.push_back(e);
   }
 }
 
 void MenuManager::display() {
-  switch (this->getCurrentMenu().getCurrentPage()) {
+  switch ( entries[currentMenu].getCurrentPage() ) {
   case MenuPage::temp:
     lcd->setCursor(0, 0);
     lcd->print("Temperaturen");
@@ -119,21 +116,21 @@ void MenuManager::display() {
 
   case MenuPage::flushMembrane:
     lcd->setCursor(0, 0);
-    lcd->printf("Membran Sp%slen", "\xF5");
+    lcd->printf("Membran Sp%slen\n", "\xF5");
     lcd->setCursor(0, 1);
     lcd->print("--> Starten <--");
     break;
 
   case MenuPage::flushSystem:
     lcd->setCursor(0, 0);
-    lcd->printf("System Sp%slen", "\xF5");
+    lcd->printf("System Sp%slen\n", "\xF5");
     lcd->setCursor(0, 1);
     lcd->print("--> Starten <--");
     break;
 
   case MenuPage::fillContainer:
     lcd->setCursor(0, 0);
-    lcd->printf("Kanister f%sllen", "\xF5");
+    lcd->printf("Kanister f%sllen\n", "\xF5");
     lcd->setCursor(0, 1);
     lcd->print("--> Starten <--");
     break;
@@ -184,7 +181,7 @@ void MenuManager::display() {
     lcd->setCursor(0, 0);
     lcd->print("Test LED Ring");
     lcd->setCursor(0, 1);
-    lcd->printf("Status: %d", state->currentLedTest);
+    lcd->printf("Status: %d\n", state->currentLedTest);
     break;
 
   case MenuPage::factoryReset:
@@ -214,10 +211,11 @@ void MenuManager::display() {
     lcd->print("unknown Page");
     break;
   }
+  // Serial.printf("%d\r\n", getCurrentMenu().getCurrentPageInt());
 }
 
 void MenuManager::handleOk() {
-  switch (this->getCurrentMenu().getCurrentPage()) {
+  switch (getCurrentMenu().getCurrentPage()) {
   case MenuPage::ledRingTest:
     state->currentLedTest++;
     if (state->currentLedTest > 6) {
@@ -244,7 +242,7 @@ void MenuManager::handleOk() {
       delay(2000);
       break;
     case 1:
-      this->goTo(5); // 5 = relayMenu ?
+      this->setMenu(5); // 5 = relayMenu ?
       break;
     case 2:
       if (!state->preferences.begin("Config", false)) {
@@ -257,43 +255,48 @@ void MenuManager::handleOk() {
       state->intervallFlushMembrane = 24;
       state->preferences.end();
       state->currentResetState = 0;
-      this->goTo(7); // 7 = hiddenMenu ?
-      this->getCurrentMenu().goTo(1); // 7->1 = resetSuccess 
+      setMenu(7); // 7 = hiddenMenu ?
+      getCurrentMenu().setPage(1); // 7->1 = resetSuccess 
       break;
     }
     break;
   }
-  if (this->currentMenu == 0) {
-    this->next();
+  if (currentMenu == 0) {
+    setMenu(getCurrentMenu().getCurrentPageInt()+1);
   }
 }
 
 void MenuManager::task() {
-  this->startMillisIdle = millis();
-  this->reset();
+  startMillisIdle = millis();
+  reset();
   lcd->clear();
   while (true) {
     if (state->rPressed) {
-      this->startMillisIdle = millis();
-      this->getCurrentMenu().next();
+      // Serial.print("rPressed\r\n");
+      startMillisIdle = millis();
+      getCurrentMenu().next();
       lcd->clear();
       state->rPressed = false;
     }
     if (state->lPressed) {
-      this->startMillisIdle = millis();
-      this->getCurrentMenu().reset();
+      // Serial.print("lPressed\r\n");
+      startMillisIdle = millis();
+      // getCurrentMenu().prev();
+      getCurrentMenu().reset();
+      setMenu(0);
       lcd->clear();
       state->lPressed = false;
     }
     if (state->okPressed) {
-      this->startMillisIdle = millis();
-      this->handleOk();
+      // Serial.print("okPressed\r\n");
+      startMillisIdle = millis();
+      handleOk();
       lcd->clear();
       state->okPressed = false;
     }
-    this->display();
-    this->currentMillisIdle = millis();
-    if (this->currentMillisIdle - this->startMillisIdle >= 10000) {
+    display();
+    currentMillisIdle = millis();
+    if (currentMillisIdle - startMillisIdle >= 10000) {
       break;
     }
     delay(500);
@@ -301,47 +304,35 @@ void MenuManager::task() {
   }
   lcd->clear();
   state->currentResetState = 0;
-  this->isOpen = false;
-  vTaskDelete(this->taskhandle);
+  isOpen = false;
+  vTaskDelete(taskhandle);
 }
 
-bool MenuManager::next() {
-  this->currentMenu++;
-  if (this->currentMenu >= this->entries.size()) {
-    this->currentMenu = 0;
-    return false;
-  }
-  this->getCurrentMenu().reset();
-  return true;
+void MenuManager::next() {
+  currentMenu = currentMenu < entries.size() - 1 ? currentMenu+1 : 0;
 }
 
-bool MenuManager::prev() {
-  if (this->currentMenu <= 0) {
-    this->currentMenu = this->entries.size() - 1;
-    return false;
-  }
-  this->currentMenu--;
-  this->getCurrentMenu().reset();
-  return true;
+void MenuManager::prev() {
+  currentMenu = currentMenu > 0 ? currentMenu-1 : entries.size()-1;
 }
 
 // go to specified MenuPage of current MenuEntry
-void MenuManager::goTo(int menu) {
-  this->currentMenu = menu < this->entries.size() ? menu : 0;
-  this->getCurrentMenu().reset();
+void MenuManager::setMenu(int menu) {
+  currentMenu = menu < entries.size() ? menu : 0;
+  getCurrentMenu().reset();
 }
 
 void MenuManager::open() {
   if (this->isOpen) 
     return;
-  this->isOpen = true;
+  isOpen = true;
   // closure [capture grouo](function args) {code}
   xTaskCreate( 
     &*[](void *parameter) {
         auto self = static_cast<MenuManager *>(parameter);
         self->task();
       },
-      "taskMenue", 10000, this, 1, &this->taskhandle
+      "taskMenue", 10000, this, 1, &taskhandle
     );
 }
 
@@ -349,5 +340,5 @@ void MenuManager::close() {
   if (!this->isOpen) 
     return;
   this->isOpen = false;
-  vTaskDelete(this->taskhandle);
+  vTaskDelete(taskhandle);
 }
