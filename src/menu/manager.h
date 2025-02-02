@@ -5,11 +5,11 @@
 #include "entry.h"
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
-#include <Vector.h>
+#include <vector>
 
 class MenuManager {
 public:
-  MenuManager(MenuEntry menus[], int countMenus);
+  MenuManager(std::initializer_list<MenuEntry> menus);
   inline ~MenuManager() { Serial.print("MenuManager destroyed"); };
 
 private:
@@ -18,9 +18,7 @@ private:
   uint64_t startMillisIdle;
   uint64_t currentMillisIdle;
   TaskHandle_t taskhandle;
-//  LiquidCrystal_I2C &lcd;
-//  State &state;
-  Vector<MenuEntry> entries;
+  std::vector<MenuEntry> entries;
 
 private:
   void display();
@@ -28,13 +26,13 @@ private:
   void task();
 
 public:
-  inline void reset() {this->goTo(0);};
-  inline bool openState() { return this->isOpen; };
-  inline MenuEntry getCurrentMenu() { return this->entries[this->currentMenu];};
-  
-  bool next();
-  bool prev();
-  void goTo(int menu);
+  inline void reset() { entries[currentMenu].setPage(0); };
+  inline bool openState() { return isOpen; };
+  inline MenuEntry &getCurrentMenu() { return entries[currentMenu]; };
+
+  void next();
+  void prev();
+  void setMenu(int menu);
   void open();
   void close();
 };
