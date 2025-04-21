@@ -15,6 +15,7 @@
 #include <math.h>
 #include <time.h>
 #include <vector>
+#include "WiFiIcons.h"
 
 #define ONE_WIRE_BUS 4
 #define STATUS_LED_RED 18
@@ -26,7 +27,7 @@
 #define FLOW_SENSOR 34
 #define FLOAT_SENSOR 36
 
-#define NTP_SERVER "0.de.pool.ntp.org"
+#define NTP_SERVER "pool.ntp.org"
 #define GMT_OFFSET_SEC 3600
 #define DAYLIGHT_OFFSET_SEC 3600
 
@@ -159,6 +160,13 @@ void setup() {
   lcd->init();
   lcd->backlight();
 
+  lcd->createChar(0, wifiLevel0);
+  lcd->createChar(1, wifiLevel1);
+  lcd->createChar(2, wifiLevel2);
+  lcd->createChar(3, wifiLevel3);
+  lcd->createChar(4, wifiDisconnected);
+  
+
   // Init LED-Ring
   setupLeds();
   // Get Time from NTP Server
@@ -166,6 +174,10 @@ void setup() {
     Serial.println("Failed to obtain time");
   //  exit(-1);
   }
+  //Zeit in Konsole ausgeben
+  char timeStringBuff[64]; // Buffer für Zeit-String
+  strftime(timeStringBuff, sizeof(timeStringBuff), "%Y-%m-%d %H:%M:%S", &timeinfo);
+  Serial.println("Aktuelle Zeit: " + String(timeStringBuff));
 
   MenuEntry mainMenu({MenuPage::temp, MenuPage::flow, MenuPage::sensor, 
                     MenuPage::function, MenuPage::relayStatus, MenuPage::test});
@@ -216,14 +228,32 @@ void loop() {
 
   if (!menuManager->openState()) {
     lcd->setCursor(0, 0);
-    lcd->printf("Status: %s\n", state->shortStatus);
+    lcd->printf("Status: %s", state->shortStatus);
     lcd->setCursor(0, 1);
-    lcd->printf("Wasser: %.2fL\n", state->flowLiters);
+    lcd->printf("Wasser: %.2fL", state->flowLiters);
+
     if (ARRAY_SIZE(state->shortStatus) < 3) {
       lcd->setCursor(11, 0);
       lcd->print(&timeinfo, "%R");
     }
+
+    lcd->setCursor(15, 0); // rechte obere Ecke
+
+    if (WiFi.status() == WL_CONNECTED) {
+      int rssi = WiFi.RSSI();
+      uint8_t level;
+    
+      if (rssi > -60)       level = 3;
+      else if (rssi > -70)  level = 2;
+      else if (rssi > -80)  level = 1;
+      else                  level = 0;
+    
+      lcd->write(level); // Custom-Char für Signalstärke
+    } else {
+      lcd->write(4); // Disconnected-Symbol
+    }    
   }
+
   sensors->requestTemperatures();
   state->temp1 = sensors->getTempCByIndex(0);
   state->temp2 = sensors->getTempCByIndex(1);
