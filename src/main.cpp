@@ -42,7 +42,6 @@ ErrorType error_state = ErrorOK;
 
 struct tm timeinfo;
 
-
 // Funktionsdeklarationen
 void IRAM_ATTR handleButtonPressOK(){ state->okPressed = true; }
 void IRAM_ATTR handleButtonPressL() { state->lPressed = true; }
@@ -53,6 +52,7 @@ void taskScheduleManager(void *);
 void setup();
 void loop();
 
+bool flushTodayDone[2] = { false, false };
 
 int main(int argc, char **argv){
   setup();
@@ -89,6 +89,7 @@ int main(int argc, char **argv){
 }
 
 void setup() {
+  
   Serial.begin(9600);
 
   pinMode(FLOW_SENSOR, INPUT);
@@ -120,6 +121,10 @@ void setup() {
 
   state->intervallFlushSystem = state->preferences.getInt("iFlushSystem", 0);
   state->intervallFlushMembrane = state->preferences.getInt("iFlushMembrane", 0);
+  state->flushTime1Hour = state->preferences.getInt("flushTime1Hour", 0);
+  state->flushTime1Minute = state->preferences.getInt("flushTime1Minute", 0);
+  state->flushTime2Hour = state->preferences.getInt("flushTime2Hour", 0);
+  state->flushTime2Minute = state->preferences.getInt("flushTime2Minute", 0);
   state->preferences.end();
 
   attachInterrupt(digitalPinToInterrupt(BUTTON_OK), handleButtonPressOK, FALLING);
@@ -271,26 +276,76 @@ void taskScheduleManager(void *parameter) {
       relais[0]->turnOn(); // Frischwasserzulauf auf
       delay(500);
       relais[1]->turnOn();  // Abwasserventil auf
-      delay(2000);        // 300000 = 5m
+      delay(5000);        // 300000 = 5m
       relais[2]->turnOn();  // Membran-Bypass auf
-      delay(2000);        // 300000 = 5m
+      delay(5000);        // 300000 = 5m
       relais[2]->turnOff(); // Membran-Bypass zu
       relais[1]->turnOff(); // Abwasserventil zu
       startup = false;
       startMillisFlush = millis();
     }
 
+    //Feste Spülzeiten
+    if (getLocalTime(&timeinfo)) {
+      char timestamp[9]; // HH:MM:SS ist 8 + \0
+      strftime(timestamp, sizeof(timestamp), "%H:%M:%S", &timeinfo);
+      if (state->flushTime1Hour != 0 || state->flushTime1Minute != 0) {
+        if (timeinfo.tm_hour == state->flushTime1Hour &&
+            timeinfo.tm_min == state->flushTime1Minute &&
+            !flushTodayDone[0]) {
+    
+              Serial.printf("[%s] [INFO] Feste Spülzeit 1 erreicht (eingestellt: %02d:%02d)\n",
+              timestamp,
+              state->flushTime1Hour,
+              state->flushTime1Minute);
+ 
+          relais[1]->turnOn();
+          delay(300000);
+          relais[1]->turnOff();
+          startMillisFlush = millis();
+          flushTodayDone[0] = true;
+        }
+      }
+    
+      if (state->flushTime2Hour != 0 || state->flushTime2Minute != 0) {
+        if (timeinfo.tm_hour == state->flushTime2Hour &&
+            timeinfo.tm_min == state->flushTime2Minute &&
+            !flushTodayDone[1]) {
+    
+              Serial.printf("[%s] [INFO] Feste Spülzeit 2 erreicht (eingestellt: %02d:%02d)\n",
+                timestamp,
+                state->flushTime2Hour,
+                state->flushTime2Minute);
+  
+          relais[1]->turnOn();
+          delay(300000);
+          relais[1]->turnOff();
+          startMillisFlush = millis();
+          flushTodayDone[1] = true;
+        }
+      }
+    
+      // Reset der Flags um Mitternacht
+      if (timeinfo.tm_hour == 0 && timeinfo.tm_min == 0) {
+        flushTodayDone[0] = false;
+        flushTodayDone[1] = false;
+      }
+    }
+     
+    
     // Alle x Stunden das System spülen
     currentMillisFlush = millis();
-    if (currentMillisFlush - startMillisFlush >=
-        (state->intervallFlushSystem * 3600000)) {
-      relais[1]->turnOn(); // Abwasserventil auf
-      delay(300000);
-      relais[1]->turnOff(); // Abwasserventil zu
-      startMillisFlush = millis();
+    if (state->intervallFlushSystem > 0 &&
+      currentMillisFlush - startMillisFlush >= (state->intervallFlushSystem * 3600000)){
+          Serial.println("[Info] Flush by Time Delay");
+          relais[1]->turnOn(); // Abwasserventil auf
+          delay(300000);
+          relais[1]->turnOff(); // Abwasserventil zu
+          startMillisFlush = millis();
     }
 
     if (state->fillContainer) {
+      Serial.println("[Info] Fill Container");
       relais[3]->turnOn();
       while (true) {
         delay(500);
@@ -303,6 +358,7 @@ void taskScheduleManager(void *parameter) {
     }
 
     if (state->flushMembrane) {
+      Serial.println("[Info] Flush Membrane");
       sprintf(state->shortStatus, "FLUSH M");
       lcd->clear();
       menuManager->close();
@@ -317,6 +373,7 @@ void taskScheduleManager(void *parameter) {
     }
 
     if (state->flushSystem) {
+      Serial.println("[Info] Flush System");
       sprintf(state->shortStatus, "FLUSH S");
       lcd->clear();
       menuManager->close();

@@ -38,6 +38,10 @@ public: // variables
   int hourOfDay;
   int intervallFlushSystem;
   int intervallFlushMembrane;
+  int flushTime1Hour;
+  int flushTime1Minute;
+  int flushTime2Hour ;
+  int flushTime2Minute;
   float flowLiters;
   double temp1;
   double temp2;

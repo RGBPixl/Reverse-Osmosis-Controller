@@ -1,18 +1,57 @@
 #pragma once
+
 #include "esp32-hal-gpio.h"
+#include <Arduino.h>
+#include <time.h>
+
+// 🔧 Relais-Pin zu Namen-Zuordnung
+inline const char* getRelaisName(uint8_t pin) {
+  switch (pin) {
+    case 12: return "Frischwasser";
+    case 27: return "Abwasser";
+    case 26: return "Membran-Bypass";
+    case 25: return "Undefined";
+    case 33: return "Undefined";
+    case 32: return "Undefined";
+    default: return "Unbekannt";
+  }
+}
 
 class Relais {
 private:
   uint8_t relaisPin;
 
+  void logState(bool state) {
+    struct tm timeinfo;
+    char timeBuffer[16] = "??:??:??";
+    if (getLocalTime(&timeinfo)) {
+      strftime(timeBuffer, sizeof(timeBuffer), "%H:%M:%S", &timeinfo);
+    }
+
+    Serial.printf("[Info] [%s] Relais '%s' (Pin %d) -> %s\n",
+                  timeBuffer,
+                  getRelaisName(relaisPin),
+                  relaisPin,
+                  state ? "ON" : "OFF");
+  }
+
 public:
   inline Relais(int rPin) : relaisPin(rPin) {
     pinMode(relaisPin, OUTPUT);
+    digitalWrite(relaisPin, LOW);
   }
 
-  inline ~Relais() { Serial.print("Relais destroyed"); }
+  inline ~Relais() {
+    Serial.printf("Relais an Pin %d destroyed\n", relaisPin);
+  }
 
-  inline void turnOn() { digitalWrite(relaisPin, HIGH); }
+  inline void turnOn() {
+    digitalWrite(relaisPin, HIGH);
+    logState(true);
+  }
 
-  inline void turnOff() { digitalWrite(relaisPin, LOW); }
+  inline void turnOff() {
+    digitalWrite(relaisPin, LOW);
+    logState(false);
+  }
 };
