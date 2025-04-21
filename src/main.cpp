@@ -4,13 +4,13 @@
 #include "menu/manager.h"
 #include "menu/page.h"
 #include "relais.h"
-#include "secrets.h"
 #include "state.h"
 #include <DallasTemperature.h>
 #include <LiquidCrystal_I2C.h>
 #include <OneWire.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <WiFiManager.h>
 #include <Wire.h>
 #include <math.h>
 #include <time.h>
@@ -126,27 +126,27 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(BUTTON_R), handleButtonPressR, FALLING);
   attachInterrupt(digitalPinToInterrupt(FLOW_SENSOR), handleFlowImpulse, FALLING);
 
-  Serial.println("Starting WiFi...");
-  // Connect to Wi-Fi
-  Serial.print("Connecting to ");
-  Serial.println(WIFI_SSID);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  
-  // 20 = max 10 sek warten
-  for(u32_t i = 0, error_state = ErrorWIFI; i < 20; i++) {
-    if(WiFi.status() == WL_CONNECTED) {
-      error_state = ErrorOK;
-      break;
-    }
-    delay(500);
-    Serial.print(".");
-  }
-  if(error_state != ErrorOK) {
+  //WiFi Connection
+  Serial.println("Starting WiFiManager...");
+
+  // WiFiManager-Instanz
+  WiFiManager wm;
+
+  // Optional: Timeout für das Konfigurationsportal (z. B. 180 Sekunden)
+  wm.setConfigPortalTimeout(180);
+
+  // Versuch, mit gespeicherten Daten zu verbinden – sonst AP starten
+  if (!wm.autoConnect("Reverse-Osmosis-Controller_AP")) {
+    Serial.println("Failed to connect and hit timeout");
+    error_state = ErrorWIFI;
     return;
+  } else {
+    error_state = ErrorOK;
   }
 
-  Serial.print("\r\n");
-  Serial.print("WiFi connected.\n\r");
+  Serial.println("WiFi connected.");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
 
   // Init
   configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
