@@ -273,14 +273,17 @@ void taskScheduleManager(void *parameter) {
   while (true) {
 
     if (startup) {
-      relais[0]->turnOn(); // Frischwasserzulauf auf
-      delay(500);
-      relais[1]->turnOn();  // Abwasserventil auf
-      delay(5000);        // 300000 = 5m
+      relais[0]->turnOn();  // Frischwasserzulauf auf
+      delay(1000);          // 1 Sekunde warten
       relais[2]->turnOn();  // Membran-Bypass auf
-      delay(5000);        // 300000 = 5m
+      delay(5000);          // 300000 = 5m
       relais[2]->turnOff(); // Membran-Bypass zu
+      relais[1]->turnOn();  // Abwasserventil auf
+      delay(5000);        
       relais[1]->turnOff(); // Abwasserventil zu
+      relais[2]->turnOn();  // Membran-Bypass auf
+      delay(5000);
+      relais[2]->turnOff(); // Membran-Bypass zu
       startup = false;
       startMillisFlush = millis();
     }
@@ -298,12 +301,10 @@ void taskScheduleManager(void *parameter) {
               timestamp,
               state->flushTime1Hour,
               state->flushTime1Minute);
- 
-          relais[1]->turnOn();
-          delay(300000);
-          relais[1]->turnOff();
-          startMillisFlush = millis();
-          flushTodayDone[0] = true;
+              
+              //Spülvorgang starten
+              state->flushSystem = true;
+              flushTodayDone[0] = true;              
         }
       }
     
@@ -316,12 +317,10 @@ void taskScheduleManager(void *parameter) {
                 timestamp,
                 state->flushTime2Hour,
                 state->flushTime2Minute);
-  
-          relais[1]->turnOn();
-          delay(300000);
-          relais[1]->turnOff();
-          startMillisFlush = millis();
-          flushTodayDone[1] = true;
+                
+                //Spülvorgang starten
+                state->flushSystem = true;
+                flushTodayDone[1] = true;                             
         }
       }
     
@@ -338,10 +337,9 @@ void taskScheduleManager(void *parameter) {
     if (state->intervallFlushSystem > 0 &&
       currentMillisFlush - startMillisFlush >= (state->intervallFlushSystem * 3600000)){
           Serial.println("[Info] Flush by Time Delay");
-          relais[1]->turnOn(); // Abwasserventil auf
-          delay(300000);
-          relais[1]->turnOff(); // Abwasserventil zu
-          startMillisFlush = millis();
+
+          //Spülvorhang starten
+          state->flushSystem = true;
     }
 
     if (state->fillContainer) {
@@ -368,6 +366,7 @@ void taskScheduleManager(void *parameter) {
       relais[2]->turnOff(); // Membran-Bypass zu
       relais[1]->turnOff(); // Abwasserventil zu
       state->flushMembrane = false;
+      startMillisFlush = millis();
       sprintf(state->shortStatus, "OK");
       lcd->clear();
     }
@@ -381,6 +380,7 @@ void taskScheduleManager(void *parameter) {
       delay(5000);        // 300000 = 5m
       relais[1]->turnOff(); // Abwasserventil zu
       state->flushSystem = false;
+      startMillisFlush = millis();
       sprintf(state->shortStatus, "OK");
       lcd->clear();
     }
