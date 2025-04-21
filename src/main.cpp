@@ -376,9 +376,17 @@ void taskScheduleManager(void *parameter) {
       sprintf(state->shortStatus, "FLUSH S");
       lcd->clear();
       menuManager->close();
+      relais[0]->turnOn();  // Frischwasserzulauf auf
+      delay(1000);          // 1 Sekunde warten
+      relais[2]->turnOn();  // Membran-Bypass auf
+      delay(60000);          // 300000 = 5m
+      relais[2]->turnOff(); // Membran-Bypass zu
       relais[1]->turnOn();  // Abwasserventil auf
-      delay(5000);        // 300000 = 5m
+      delay(60000);        
       relais[1]->turnOff(); // Abwasserventil zu
+      relais[2]->turnOn();  // Membran-Bypass auf
+      delay(60000);
+      relais[2]->turnOff(); // Membran-Bypass zu
       state->flushSystem = false;
       startMillisFlush = millis();
       sprintf(state->shortStatus, "OK");
