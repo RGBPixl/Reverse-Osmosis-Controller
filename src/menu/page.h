@@ -27,5 +27,6 @@ enum MenuPage : int {
   relay6,
   ledRingTest,
   resetConfirm,
-  resetSuccess
+  resetSuccess,
+  mqttConfig
 };

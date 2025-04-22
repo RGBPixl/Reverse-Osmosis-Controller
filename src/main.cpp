@@ -16,6 +16,8 @@
 #include <time.h>
 #include <vector>
 #include "WiFiIcons.h"
+#include "mqtt_handler.h"
+#include "webserver/webpanel.h"
 
 #define ONE_WIRE_BUS 4
 #define STATUS_LED_RED 18
@@ -30,6 +32,9 @@
 #define NTP_SERVER "pool.ntp.org"
 #define GMT_OFFSET_SEC 3600
 #define DAYLIGHT_OFFSET_SEC 3600
+
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
 
 Relais *relais[6]; 
 
@@ -52,7 +57,13 @@ void taskScheduleManager(void *);
 void setup();
 void loop();
 
+String mqtt_server = "";
+String mqtt_username = "";
+String mqtt_password = "";
+String mqtt_client_id = "reverse_osmosis_controller";
+
 bool flushTodayDone[2] = { false, false };
+bool mqtt_enabled = true;
 
 int main(int argc, char **argv){
   setup();
@@ -119,13 +130,26 @@ void setup() {
     Serial.println("Failed to initialize NVS");
   }
 
-  state->intervallFlushSystem = state->preferences.getInt("iFlushSystem", 0);
-  state->intervallFlushMembrane = state->preferences.getInt("iFlushMembrane", 0);
-  state->flushTime1Hour = state->preferences.getInt("flushTime1Hour", 0);
-  state->flushTime1Minute = state->preferences.getInt("flushTime1Minute", 0);
-  state->flushTime2Hour = state->preferences.getInt("flushTime2Hour", 0);
-  state->flushTime2Minute = state->preferences.getInt("flushTime2Minute", 0);
+  state->intervallFlushSystem = state->preferences.getInt("iFS", 0);
+  state->intervallFlushMembrane = state->preferences.getInt("iFM", 0);
+  state->flushTime1Hour = state->preferences.getInt("fT1H", 0);
+  state->flushTime1Minute = state->preferences.getInt("fT1M", 0);
+  state->flushTime2Hour = state->preferences.getInt("fT2H", 0);
+  state->flushTime2Minute = state->preferences.getInt("fT2M", 0);
   state->preferences.end();
+
+  Preferences prefs;
+  prefs.begin("MQTT", true);
+  mqtt_server = prefs.getString("mqtt_server", "");
+  mqtt_username = prefs.getString("mqtt_user", "");
+  mqtt_password = prefs.getString("mqtt_pass", "");
+  prefs.end();
+
+  prefs.begin("Runtime", true);
+  state->flowLiters = prefs.getFloat("flowLiters", 0.0f);
+  prefs.end();
+
+  Serial.printf("[MQTT] flowLiters geladen: %.2f L\n", state->flowLiters);
 
   attachInterrupt(digitalPinToInterrupt(BUTTON_OK), handleButtonPressOK, FALLING);
   attachInterrupt(digitalPinToInterrupt(BUTTON_L), handleButtonPressL, FALLING);
@@ -174,6 +198,13 @@ void setup() {
 
   // Init LED-Ring
   setupLeds();
+
+  //Init Webserver
+  setupWebServer();
+
+  // Init MQTT
+  setupMqtt();
+
   // Get Time from NTP Server
   if (!getLocalTime(&timeinfo)) {
     Serial.println("Failed to obtain time");
@@ -192,7 +223,7 @@ void setup() {
                       MenuPage::sensor6});
   MenuEntry functionMenu({MenuPage::disinfection, MenuPage::flushMembrane,
                         MenuPage::flushSystem, MenuPage::fillContainer,
-                        MenuPage::factoryReset});
+                        MenuPage::factoryReset, MenuPage::mqttConfig});
   MenuEntry relayMenu({MenuPage::relay1, MenuPage::relay2, MenuPage::relay3,
                      MenuPage::relay4, MenuPage::relay5, MenuPage::relay6});
   MenuEntry testMenu({MenuPage::ledRingTest});
@@ -262,6 +293,9 @@ void loop() {
   sensors->requestTemperatures();
   state->temp1 = sensors->getTempCByIndex(0);
   state->temp2 = sensors->getTempCByIndex(1);
+
+  handleWebServer();
+  handleMqttLoop();
   delay(500);
 }
 
@@ -273,6 +307,10 @@ void taskScheduleManager(void *parameter) {
   while (true) {
 
     if (startup) {
+      relais[3]->turnOff(); // Container zu
+      relais[4]->turnOff(); // Reserve 1 zu
+      relais[5]->turnOff(); // Reserve 2 zu
+      delay(1000);  
       relais[0]->turnOn();  // Frischwasserzulauf auf
       delay(1000);          // 1 Sekunde warten
       relais[2]->turnOn();  // Membran-Bypass auf
@@ -284,7 +322,9 @@ void taskScheduleManager(void *parameter) {
       relais[2]->turnOn();  // Membran-Bypass auf
       delay(5000);
       relais[2]->turnOff(); // Membran-Bypass zu
+      relais[0]->turnOff();  // Frischwasserzulauf zu
       startup = false;
+      checkAndPublishRelayStates();
       startMillisFlush = millis();
     }
 
@@ -360,11 +400,13 @@ void taskScheduleManager(void *parameter) {
       sprintf(state->shortStatus, "FLUSH M");
       lcd->clear();
       menuManager->close();
+      relais[0]->turnOn();  // Frischwasserzulauf auf
       relais[1]->turnOn();  // Abwasserventil auf
       relais[2]->turnOn();  // Membran-Bypass auf
       delay(5000);        // 300000 = 5m
       relais[2]->turnOff(); // Membran-Bypass zu
       relais[1]->turnOff(); // Abwasserventil zu
+      relais[0]->turnOff();  // Frischwasserzulauf zu
       state->flushMembrane = false;
       startMillisFlush = millis();
       sprintf(state->shortStatus, "OK");
@@ -387,6 +429,7 @@ void taskScheduleManager(void *parameter) {
       relais[2]->turnOn();  // Membran-Bypass auf
       delay(60000);
       relais[2]->turnOff(); // Membran-Bypass zu
+      relais[0]->turnOff();  // Frischwasserzulauf zu
       state->flushSystem = false;
       startMillisFlush = millis();
       sprintf(state->shortStatus, "OK");

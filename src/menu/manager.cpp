@@ -6,6 +6,9 @@
 #include "global_vars.h"
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
+#include <WiFiManager.h>
+
+extern bool mqtt_enabled;
 
 MenuManager::MenuManager(std::initializer_list<MenuEntry> menus)
     : currentMenu(0), startMillisIdle(millis()), currentMillisIdle(millis()), isOpen(false) {
@@ -42,6 +45,13 @@ void MenuManager::display() {
     lcd->print("Funktionen");
     lcd->setCursor(14, 1);
     lcd->print("->");
+    break;
+
+  case MenuPage::mqttConfig:
+    lcd->setCursor(0, 0);
+    lcd->print("MQTT Setup");
+    lcd->setCursor(0, 1);
+    lcd->print("--> Starten <--");
     break;
 
   case MenuPage::relayStatus:
@@ -216,55 +226,73 @@ void MenuManager::display() {
 
 void MenuManager::handleOk() {
   switch (getCurrentMenu().getCurrentPage()) {
-  case MenuPage::ledRingTest:
-    state->currentLedTest++;
-    if (state->currentLedTest > 6) {
-      state->currentLedTest = 0;
-    }
-    state->ledState = (LedState)state->currentLedTest;
-    break;
-  case MenuPage::fillContainer:
-    state->fillContainer = true;
-    break;
-  case MenuPage::flushMembrane:
-    state->flushMembrane = true;
-    break;
-  case MenuPage::flushSystem:
-    state->flushSystem = true;
-    break;
-  case MenuPage::factoryReset:
-  case MenuPage::resetConfirm:
-    state->currentResetState++;
-    switch (state->currentResetState) {
-    case 0:
-      lcd->setCursor(0, 0);
-      lcd->print("ERROR");
-      delay(2000);
-      break;
-    case 1:
-      this->setMenu(5); // 5 = relayMenu ?
-      break;
-    case 2:
-      if (!state->preferences.begin("Config", false)) {
-        Serial.println("Failed to initialize NVS");
-        return;
+    case MenuPage::ledRingTest:
+      state->currentLedTest++;
+      if (state->currentLedTest > 6) {
+        state->currentLedTest = 0;
       }
-      state->preferences.putInt("iFlushSystem", 8);
-      state->intervallFlushSystem = 8;
-      state->preferences.putInt("iFlushMembrane", 24);
-      state->intervallFlushMembrane = 24;
-      state->preferences.end();
-      state->currentResetState = 0;
-      setMenu(7); // 7 = hiddenMenu ?
-      getCurrentMenu().setPage(1); // 7->1 = resetSuccess 
+      state->ledState = (LedState)state->currentLedTest;
       break;
-    }
-    break;
+
+    case MenuPage::fillContainer:
+      state->fillContainer = true;
+      break;
+
+    case MenuPage::flushMembrane:
+      state->flushMembrane = true;
+      break;
+
+    case MenuPage::flushSystem:
+      state->flushSystem = true;
+      break;
+
+    case MenuPage::factoryReset:
+    case MenuPage::resetConfirm:
+      state->currentResetState++;
+      switch (state->currentResetState) {
+        case 0:
+          lcd->setCursor(0, 0);
+          lcd->print("ERROR");
+          delay(2000);
+          break;
+        case 1:
+          this->setMenu(5); // 5 = relayMenu ?
+          break;
+        case 2:
+          if (!state->preferences.begin("Config", false)) {
+            Serial.println("Failed to initialize NVS");
+            return;
+          }
+          state->preferences.putInt("iFlushSystem", 8);
+          state->intervallFlushSystem = 8;
+          state->preferences.putInt("iFlushMembrane", 24);
+          state->intervallFlushMembrane = 24;
+          state->preferences.end();
+          state->currentResetState = 0;
+          setMenu(7); // 7 = hiddenMenu ?
+          getCurrentMenu().setPage(1); // 7->1 = resetSuccess 
+          break;
+      }
+      break;
+
+    case MenuPage::mqttConfig:
+      lcd->clear();
+      lcd->setCursor(0, 0);
+      lcd->print("Webpanel:");
+      lcd->setCursor(0, 1);
+      lcd->print(WiFi.localIP().toString().c_str());
+      delay(3000);
+      close();
+      break;
+    
+
   }
+
   if (currentMenu == 0) {
-    setMenu(getCurrentMenu().getCurrentPageInt()+1);
+    setMenu(getCurrentMenu().getCurrentPageInt() + 1);
   }
 }
+
 
 void MenuManager::task() {
   startMillisIdle = millis();

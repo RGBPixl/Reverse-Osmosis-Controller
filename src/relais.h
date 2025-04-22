@@ -10,9 +10,9 @@ inline const char* getRelaisName(uint8_t pin) {
     case 12: return "Frischwasser";
     case 27: return "Abwasser";
     case 26: return "Membran-Bypass";
-    case 25: return "Undefined";
-    case 33: return "Undefined";
-    case 32: return "Undefined";
+    case 25: return "Container";
+    case 33: return "Reserve 1";
+    case 32: return "Reserve 2";
     default: return "Unbekannt";
   }
 }
@@ -53,5 +53,9 @@ public:
   inline void turnOff() {
     digitalWrite(relaisPin, LOW);
     logState(false);
+  }
+
+  inline bool isOn() const {
+    return digitalRead(relaisPin) == HIGH;
   }
 };
