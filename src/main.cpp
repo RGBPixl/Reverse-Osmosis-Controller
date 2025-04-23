@@ -28,6 +28,7 @@
 #define BUTTON_R 0
 #define FLOW_SENSOR 34
 #define FLOAT_SENSOR 36
+#define PRESSURE_SWITCH 35
 
 #define NTP_SERVER "pool.ntp.org"
 #define GMT_OFFSET_SEC 3600
@@ -56,6 +57,8 @@ void IRAM_ATTR handleFlowImpulse()  { state->flowImpulseCount++; }
 void taskScheduleManager(void *);
 void setup();
 void loop();
+bool isIdle();
+bool isSystemPressurized();
 
 String mqtt_server = "";
 String mqtt_username = "";
@@ -384,12 +387,14 @@ void taskScheduleManager(void *parameter) {
 
     if (state->fillContainer) {
       Serial.println("[Info] Fill Container");
+      sprintf(state->shortStatus, "FILL C");
       relais[3]->turnOn();
       while (true) {
         delay(500);
         if (digitalRead(FLOAT_SENSOR)) {
           relais[3]->turnOff();
           state->fillContainer = false;
+          sprintf(state->shortStatus, "OK");
           break;
         }
       }
@@ -429,13 +434,29 @@ void taskScheduleManager(void *parameter) {
       relais[2]->turnOn();  // Membran-Bypass auf
       delay(60000);
       relais[2]->turnOff(); // Membran-Bypass zu
-      relais[0]->turnOff();  // Frischwasserzulauf zu
+      relais[0]->turnOff(); // Frischwasserzulauf zu
       state->flushSystem = false;
       startMillisFlush = millis();
       sprintf(state->shortStatus, "OK");
       lcd->clear();
     }
 
+    if (isIdle()) {         // Frischwasserzulauf zu, wenn Systemdruck ausreichend ist
+      if (isSystemPressurized()) {
+        relais[0]->turnOff();
+      } else {
+        relais[0]->turnOn();
+      }
+    }
+
     delay(500);
   }
+}
+
+bool isIdle() {
+  return strcmp(state->shortStatus, "OK") == 0;
+}
+
+bool isSystemPressurized() {
+  return digitalRead(PRESSURE_SWITCH) == HIGH;
 }
