@@ -60,6 +60,8 @@ void loop();
 bool isIdle();
 bool isSystemPressurized();
 
+extern bool blockExternalRelayControl;
+
 String mqtt_server = "";
 String mqtt_username = "";
 String mqtt_password = "";
@@ -313,22 +315,25 @@ void taskScheduleManager(void *parameter) {
       relais[3]->turnOff(); // Container zu
       relais[4]->turnOff(); // Reserve 1 zu
       relais[5]->turnOff(); // Reserve 2 zu
-      delay(1000);  
+      blockExternalRelayControl = true;
+      delay(5000);  
       relais[0]->turnOn();  // Frischwasserzulauf auf
-      delay(1000);          // 1 Sekunde warten
+      delay(5000);          // 5 Sekunde warten
       relais[2]->turnOn();  // Membran-Bypass auf
-      delay(5000);          // 300000 = 5m
+      delay(10000);          // 300000 = 5m
       relais[2]->turnOff(); // Membran-Bypass zu
       relais[1]->turnOn();  // Abwasserventil auf
-      delay(5000);        
+      delay(10000);        
       relais[1]->turnOff(); // Abwasserventil zu
       relais[2]->turnOn();  // Membran-Bypass auf
-      delay(5000);
+      delay(10000);
       relais[2]->turnOff(); // Membran-Bypass zu
       relais[0]->turnOff();  // Frischwasserzulauf zu
       startup = false;
       checkAndPublishRelayStates();
       startMillisFlush = millis();
+      delay(1000);
+      blockExternalRelayControl = false;
     }
 
     //Feste Spülzeiten
@@ -403,6 +408,7 @@ void taskScheduleManager(void *parameter) {
     if (state->flushMembrane) {
       Serial.println("[Info] Flush Membrane");
       sprintf(state->shortStatus, "FLUSH M");
+      blockExternalRelayControl = true;
       lcd->clear();
       menuManager->close();
       relais[0]->turnOn();  // Frischwasserzulauf auf
@@ -415,12 +421,14 @@ void taskScheduleManager(void *parameter) {
       state->flushMembrane = false;
       startMillisFlush = millis();
       sprintf(state->shortStatus, "OK");
+      blockExternalRelayControl = false;
       lcd->clear();
     }
 
     if (state->flushSystem) {
       Serial.println("[Info] Flush System");
       sprintf(state->shortStatus, "FLUSH S");
+      blockExternalRelayControl = true;
       lcd->clear();
       menuManager->close();
       relais[0]->turnOn();  // Frischwasserzulauf auf
@@ -438,16 +446,25 @@ void taskScheduleManager(void *parameter) {
       state->flushSystem = false;
       startMillisFlush = millis();
       sprintf(state->shortStatus, "OK");
+      blockExternalRelayControl = false;
       lcd->clear();
     }
 
-    if (isIdle()) {         // Frischwasserzulauf zu, wenn Systemdruck ausreichend ist
+    if (isIdle()) {
+      // Frischwasserzulauf zu, wenn Systemdruck ausreichend ist
       if (isSystemPressurized()) {
-        relais[0]->turnOff();
+        if (relais[0]->isOn()) {
+          Serial.println("[Info] Druck ok, Frischwasserzulauf zu");
+          relais[0]->turnOff();
+        }
       } else {
-        relais[0]->turnOn();
+        if (!relais[0]->isOn()) {
+          Serial.println("[Info] Druckabfall, Frischwasserzulauf auf");
+          relais[0]->turnOn();
+        }
       }
     }
+    
 
     delay(500);
   }

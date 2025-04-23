@@ -22,8 +22,10 @@ const unsigned long mqttRetryInterval = 30000;
 float lastTemp1 = -999.0;
 float lastTemp2 = -999.0;
 float lastFlow = -999.0;
+
 bool lastFloatSensor = false;
 bool lastRelayState[6] = {false, false, false, false, false, false};
+bool blockExternalRelayControl = false;
 
 float lastSavedLiters = 0.0;
 unsigned long lastSaveTime = 0;
@@ -31,84 +33,91 @@ unsigned long lastSaveTime = 0;
 // MQTT Callback-Funktion
 // Diese Funktion wird aufgerufen, wenn eine Nachricht auf einem abonnierten Thema empfangen wird
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-    String msg;
-    for (unsigned int i = 0; i < length; i++) {
-      msg += (char)payload[i];
+  String msg;
+  for (unsigned int i = 0; i < length; i++) {
+    msg += (char)payload[i];
+  }
+  msg.trim();
+  msg.toUpperCase();
+
+  Serial.printf("[MQTT] topic = '%s', payload = '%s'\n", topic, msg.c_str());
+
+  Preferences prefs;
+
+  if (String(topic) == "reverse_osmosis/flush_interval/set") {
+    int interval = msg.toInt();
+    prefs.begin("Config", false);
+    prefs.putInt("iFS", interval);
+    prefs.end();
+    state->intervallFlushSystem = interval;
+
+  } else if (String(topic) == "reverse_osmosis/flush_time1/set" || String(topic) == "reverse_osmosis/flush_time2/set") {
+    String keyPrefix = String(topic).endsWith("flush_time1/set") ? "fT1" : "fT2";
+    int hour = -1, minute = -1;
+    if (msg.length() == 5 && msg.charAt(2) == ':') {
+      hour = msg.substring(0, 2).toInt();
+      minute = msg.substring(3, 5).toInt();
     }
-    msg.trim();
-    msg.toUpperCase();
-  
-    Serial.printf("[MQTT] topic = '%s', payload = '%s'\n", topic, msg.c_str());
-  
-    Preferences prefs;
-  
-    if (String(topic) == "reverse_osmosis/flush_interval/set") {
-      int interval = msg.toInt();
+
+    String topicOut = "reverse_osmosis/flush_" + String((keyPrefix == "fT1") ? "time1" : "time2") + "/state";
+
+    if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60) {
       prefs.begin("Config", false);
-      prefs.putInt("iFS", interval);
+      prefs.putInt((keyPrefix + "H").c_str(), hour);
+      prefs.putInt((keyPrefix + "M").c_str(), minute);
       prefs.end();
-      state->intervallFlushSystem = interval;
-  
-    } else if (String(topic) == "reverse_osmosis/flush_time1/set" || String(topic) == "reverse_osmosis/flush_time2/set") {
-      String keyPrefix = String(topic).endsWith("flush_time1/set") ? "fT1" : "fT2";
-      int hour = -1, minute = -1;
-      if (msg.length() == 5 && msg.charAt(2) == ':') {
-        hour = msg.substring(0, 2).toInt();
-        minute = msg.substring(3, 5).toInt();
+
+      if (keyPrefix == "fT1") {
+        state->flushTime1Hour = hour;
+        state->flushTime1Minute = minute;
+      } else if (keyPrefix == "fT2") {
+        state->flushTime2Hour = hour;
+        state->flushTime2Minute = minute;
       }
-  
-      String topicOut = "reverse_osmosis/flush_" + String((keyPrefix == "fT1") ? "time1" : "time2") + "/state";
-  
-      if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60) {
-        prefs.begin("Config", false);
-        prefs.putInt((keyPrefix + "H").c_str(), hour);
-        prefs.putInt((keyPrefix + "M").c_str(), minute);
-        prefs.end();
-  
-        if (keyPrefix == "fT1") {
-          state->flushTime1Hour = hour;
-          state->flushTime1Minute = minute;
-        } else if (keyPrefix == "fT2") {
-          state->flushTime2Hour = hour;
-          state->flushTime2Minute = minute;
-        }
-  
-        mqttClient.publish(topicOut.c_str(), msg.c_str(), true);
-      } else {
-        mqttClient.publish(topicOut.c_str(), "00:00", true);
-      }
-  
-    } else if (String(topic) == "reverse_osmosis/reset_flow/set") {
-      if (msg == "PRESS" || msg == "1") {
-        state->flowLiters = 0.0f;
-        lastSavedLiters = 0.0f;
-  
-        prefs.begin("Runtime", false);
-        prefs.putFloat("flowLiters", 0.0f);
-        prefs.end();
-  
-        mqttClient.publish("reverse_osmosis/flowLiters/state", "0.00", true);
-        Serial.println("[MQTT] flowLiters wurde auf 0 zurückgesetzt");
-      }
+
+      mqttClient.publish(topicOut.c_str(), msg.c_str(), true);
+    } else {
+      mqttClient.publish(topicOut.c_str(), "00:00", true);
     }
-  
-    // Relais-Steuerung via MQTT
-    for (int i = 0; i < 6; i++) {
-      String expectedTopic = "reverse_osmosis/relay_" + String(i) + "/set";
-      if (String(topic) == expectedTopic) {
-        Serial.printf("[MQTT] Steuerung erkannt: Relais %d <- %s\n", i, msg.c_str());
-        
-        if (msg == "ON") {
-          relais[i]->turnOn();
-        } else if (msg == "OFF") {
-          relais[i]->turnOff();
-        }
-  
-        mqttClient.publish(("reverse_osmosis/relay_" + String(i) + "/state").c_str(),
-                           relais[i]->isOn() ? "ON" : "OFF", true);
+
+  } else if (String(topic) == "reverse_osmosis/reset_flow/set") {
+    if (msg == "PRESS" || msg == "1") {
+      state->flowLiters = 0.0f;
+      lastSavedLiters = 0.0f;
+
+      prefs.begin("Runtime", false);
+      prefs.putFloat("flowLiters", 0.0f);
+      prefs.end();
+
+      mqttClient.publish("reverse_osmosis/flowLiters/state", "0.00", true);
+      Serial.println("[MQTT] flowLiters wurde auf 0 zurückgesetzt");
+    }
+  }
+
+  // 🔌 Relais-Steuerung via MQTT
+  for (int i = 0; i < 6; i++) {
+    String expectedTopic = "reverse_osmosis/relay_" + String(i) + "/set";
+    if (String(topic) == expectedTopic) {
+      Serial.printf("[MQTT] Steuerung erkannt: Relais %d <- %s\n", i, msg.c_str());
+
+      if (blockExternalRelayControl) {
+        Serial.printf("[Info] Relaissteuerung blockiert – Relais %d wird ignoriert\n", i);
         break;
       }
+
+      bool current = relais[i]->isOn();
+
+      if (msg == "ON" && !current) {
+        relais[i]->turnOn();
+      } else if (msg == "OFF" && current) {
+        relais[i]->turnOff();
+      }
+
+      mqttClient.publish(("reverse_osmosis/relay_" + String(i) + "/state").c_str(),
+                         relais[i]->isOn() ? "ON" : "OFF", true);
+      break;
     }
+  }
 }
  
   
