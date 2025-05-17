@@ -118,6 +118,7 @@ void setup() {
   pinMode(BUTTON_R, INPUT_PULLUP);
 
   pinMode(FLOAT_SENSOR, INPUT);
+  pinMode(PRESSURE_SWITCH, INPUT);
 
   relais[0] = new Relais(12);
   relais[1] = new Relais(27);
@@ -465,7 +466,6 @@ void taskScheduleManager(void *parameter) {
       }
     }
     
-
     delay(500);
   }
 }
