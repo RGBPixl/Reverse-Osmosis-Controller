@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "io.h"
 #include "programs.h"
 #include "valves.h"
 
@@ -42,6 +43,22 @@ struct ControllerStatus {
   FaultReason fault = FaultReason::None;
   uint8_t warnings = 0;
   uint32_t inletOpenMs = 0;  // wie lange der Zulauf schon offen ist, 0 = zu
+};
+
+// Messwerte aus der Hardware-Schicht
+struct Measurements {
+  float tempC[2] = {0.0f, 0.0f};  // 0 = vor Filter, 1 = nach Filter
+  bool tempValid[2] = {false, false};
+  double totalLiters = 0.0;  // Wassermenge im Zulauf
+  float flowLpm = 0.0f;      // Durchfluss im Zulauf
+  bool pressurized = false;  // entprellter Druckschalter
+};
+
+// Alles, was Display, LEDs und (ab Phase 4) MQTT und Webpanel anzeigen.
+struct SystemStatus {
+  ControllerStatus controller;
+  Measurements measurements;
+  WallClock clock;
 };
 
 inline const char* modeName(Mode m) {

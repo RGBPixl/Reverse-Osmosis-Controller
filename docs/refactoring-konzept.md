@@ -177,14 +177,18 @@ gemeldet, sodass sich typische Werte für Entnahme und Druckaufbau im Verlauf ab
 - **Display:**
   - Neu gezeichnet werden nur Zeilen, die sich geändert haben. Das verhindert Flackern und Müllzeichen.
   - Die Startseite zeigt Zustand, Uhrzeit, WLAN-Symbol und Wassermenge.
-- **Menü:** wird als Baum definiert, nicht über magische Indizes. Links = zurück, Rechts = weiter, OK = auswählen.
-  Nach 30 s ohne Eingabe geht es zurück zur Startseite.
+- **Menü:** wird als Baum definiert, nicht über magische Indizes. Links = zurück, Rechts = weiter, OK = auswählen,
+  Links lang = Startseite. Nach 30 s ohne Eingabe geht es zurück zur Startseite. Bei einem Fehler führt OK auf der
+  Startseite direkt zu „Fehler quittieren“.
 
 ```
-Status        → Temperaturen, Wassermenge, Durchfluss, Druck, Ventile (echte Zustände)
-Aktionen      → Systemspülung, Membranspülung, Service-Modus, Fehler quittieren
-Netzwerk      → IP + Signal, MQTT-Status, WLAN einrichten
-System        → Zähler zurücksetzen, LED-Test, Werksreset, Version
+Status        → Temperaturen, Wassermenge, Durchfluss, Druckschalter, Ventile, Uhrzeit
+Aktionen      → Fehler quittieren*, Systemspülung, Membranspülung, Spülung stoppen*, Service-Modus,
+                Ventil Zulauf / Abwasser / Bypass*
+Netzwerk      → IP + Signal, MQTT-Status, WLAN einrichten (Phase 4)
+System        → Zähler löschen, LED-Test, Werksreset, Version
+
+* nur sichtbar, wenn es passt: Fehler aktiv, Spülung läuft, Service-Modus an
 ```
 
 Kritische Aktionen (Werksreset, Zähler zurücksetzen) brauchen eine Bestätigung: „OK zum Bestätigen“, mit Timeout.
