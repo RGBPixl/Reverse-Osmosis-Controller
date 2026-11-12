@@ -8,6 +8,7 @@
 
 #include "../config/pins.h"
 #include "../util/log.h"
+#include "brightness.h"
 
 namespace ui {
 
@@ -17,6 +18,12 @@ CRGB gRing[pins::kLedRingCount];
 
 constexpr uint32_t kSpinStepMs = 100;
 constexpr uint32_t kBlinkMs = 500;
+
+// PWM für die Status-LED. Der LED-Ring (FastLED) benutzt RMT, nicht LEDC, die Kanäle sind also frei.
+constexpr uint8_t kStatusPins[3] = {pins::kStatusLedRed, pins::kStatusLedGreen, pins::kStatusLedBlue};
+constexpr uint8_t kStatusChannels[3] = {0, 1, 2};
+constexpr uint32_t kStatusPwmHz = 5000;
+constexpr uint8_t kStatusPwmBits = 8;
 
 bool blinkOn(uint32_t nowMs) { return (nowMs / kBlinkMs) % 2 == 0; }
 
@@ -41,9 +48,10 @@ void Leds::begin() {
   fillRing(CRGB::Black);
   FastLED.show();
 
-  pinMode(pins::kStatusLedRed, OUTPUT);
-  pinMode(pins::kStatusLedGreen, OUTPUT);
-  pinMode(pins::kStatusLedBlue, OUTPUT);
+  for (uint8_t i = 0; i < 3; ++i) {
+    ledcSetup(kStatusChannels[i], kStatusPwmHz, kStatusPwmBits);
+    ledcAttachPin(kStatusPins[i], kStatusChannels[i]);
+  }
   setStatusLed(false, false, false);
   util::logf("LEDs", "Initialisiert");
 }
@@ -124,12 +132,24 @@ bool Leds::runTest(uint32_t nowMs) {
   return true;
 }
 
+void Leds::setStatusBrightness(uint8_t percent) {
+  const uint8_t duty = perceivedToDuty(percent);
+  if (duty != statusDuty_) {
+    statusDuty_ = duty;
+    util::logf("LEDs", "Status-LED: %u %% Helligkeit, Einschaltdauer %u/255", static_cast<unsigned>(percent),
+               static_cast<unsigned>(duty));
+  }
+}
+
 void Leds::setStatusLed(bool red, bool green, bool blue) {
-  const uint8_t on = kStatusLedActiveHigh ? HIGH : LOW;
-  const uint8_t off = kStatusLedActiveHigh ? LOW : HIGH;
-  digitalWrite(pins::kStatusLedRed, red ? on : off);
-  digitalWrite(pins::kStatusLedGreen, green ? on : off);
-  digitalWrite(pins::kStatusLedBlue, blue ? on : off);
+  const uint32_t level = statusDuty_;
+  const bool activeHigh = kStatusLedActiveHigh;  // lokale Kopie, siehe Hinweis zu C++11 in mqtt.cpp
+  const uint32_t on = activeHigh ? level : 255u - level;
+  const uint32_t off = activeHigh ? 0u : 255u;
+  const bool colors[3] = {red, green, blue};
+  for (uint8_t i = 0; i < 3; ++i) {
+    ledcWrite(kStatusChannels[i], colors[i] ? on : off);
+  }
 }
 
 }  // namespace ui

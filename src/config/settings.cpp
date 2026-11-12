@@ -55,6 +55,7 @@ bool sanitize(Settings& s) {
 
   changed |= clampFloat(s.drawThresholdLpm, 0.0f, kMaxDrawThresholdLpm, defaults.drawThresholdLpm);
   changed |= clampFloat(s.litersPerPulse, kMinLitersPerPulse, kMaxLitersPerPulse, defaults.litersPerPulse);
+  changed |= clampTo<uint8_t>(s.statusLedPercent, 0, kMaxStatusLedPercent);
 
   if (s.mqttPort == 0) {
     s.mqttPort = defaults.mqttPort;

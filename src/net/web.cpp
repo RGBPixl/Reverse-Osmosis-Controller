@@ -298,6 +298,11 @@ void WebPanel::handleSettingsForm() {
                       config::kMaxLitersPerPulse, "any", "L", 6);
   body += "</fieldset>";
 
+  body += "<fieldset><legend>Anzeige</legend>";
+  body += numberInput("led_pct", "Helligkeit Status-LED (0 = aus)", s.statusLedPercent, 0,
+                      config::kMaxStatusLedPercent, "1", "%");
+  body += "</fieldset>";
+
   body += "<fieldset><legend>MQTT</legend>";
   body += "<label>Server<span><input type=text name=mqtt_server value=\"" + escapeHtml(s.mqttServer) +
           "\" placeholder=\"leer = aus\"></span></label>";
@@ -348,6 +353,7 @@ void WebPanel::handleSettingsSave() {
   if (integer("inlet_max", v)) s.inletMaxOpenS = toU16(v);
   if (decimal("draw_lpm", f)) s.drawThresholdLpm = f;
   if (decimal("l_per_pulse", f)) s.litersPerPulse = f;
+  if (integer("led_pct", v)) s.statusLedPercent = toU8(v);
 
   const char* const prefixes[] = {"t1", "t2"};
   for (size_t i = 0; i < config::kFlushTimeCount; ++i) {

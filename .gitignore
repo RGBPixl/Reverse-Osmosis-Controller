@@ -2,3 +2,6 @@
 .vscode
 src/debugging.cpp
 
+
+# Flash-Sicherungen der Anlage (enthalten WLAN- und MQTT-Passwörter)
+backup/

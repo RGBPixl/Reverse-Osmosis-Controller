@@ -38,6 +38,7 @@ void App::setup() {
   temperature_.begin(now);
   display_.begin();
   leds_.begin();
+  leds_.setStatusBrightness(settings_.statusLedPercent);
 
   controller_.setLogSink(logController);
   controller_.begin(settings_, now, lastBoot);
@@ -117,6 +118,7 @@ void App::handleSettingsChanges(uint32_t nowMs) {
     settingsVersion_ = version;
     controller_.setSettings(settings_);
     flow_.setLitersPerPulse(settings_.litersPerPulse);
+    leds_.setStatusBrightness(settings_.statusLedPercent);
     settingsDirty_ = true;
     settingsChangedMs_ = nowMs;
   }

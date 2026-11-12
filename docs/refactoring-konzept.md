@@ -210,6 +210,9 @@ Kritische Aktionen (Werksreset, Zähler zurücksetzen) brauchen eine Bestätigun
 | rot | kein WLAN |
 | blau, blinkend | Einrichtungsportal offen |
 
+Die Status-LED wird per PWM gedimmt. Die Helligkeit stellst du im Webpanel unter „Anzeige“ in Prozent ein, so wie das
+Auge sie wahrnimmt (Gamma 2,2). Standard ist 10 %, das entspricht 2 von 255 Einschaltdauer.
+
 ### Home Assistant
 
 Die bestehenden Topics (`reverse_osmosis/...`) und `unique_id`s bleiben erhalten, damit Entitäten und Verlauf in HA

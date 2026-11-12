@@ -35,6 +35,9 @@ struct Settings {
   // Durchflusssensor
   float litersPerPulse = 0.00052f;
 
+  // Anzeige: Helligkeit der Status-LED in Prozent, wie das Auge sie wahrnimmt (0 = aus)
+  uint8_t statusLedPercent = 10;
+
   // MQTT
   char mqttServer[64] = "";
   uint16_t mqttPort = 1883;
@@ -50,6 +53,7 @@ constexpr uint16_t kMinPressureBuildS = 30, kMaxPressureBuildS = 3600;
 constexpr uint16_t kMinInletOpenS = 60, kMaxInletOpenS = 7200;
 constexpr float kMaxDrawThresholdLpm = 100.0f;
 constexpr float kMinLitersPerPulse = 0.00001f, kMaxLitersPerPulse = 1.0f;
+constexpr uint8_t kMaxStatusLedPercent = 100;
 
 // Bringt alle Werte in gültige Bereiche und stellt sicher, dass Texte abgeschlossen sind.
 // Gibt true zurück, wenn etwas korrigiert werden musste.

@@ -100,6 +100,7 @@ void test_settings_sanitize_clamps_invalid_values() {
   s.mqttPort = 0;
   s.membraneFlushS = 1;
   s.mqttServer[sizeof(s.mqttServer) - 1] = 'x';
+  s.statusLedPercent = 150;
 
   TEST_ASSERT_TRUE(config::sanitize(s));
   TEST_ASSERT_EQUAL_UINT8(23, s.flushTimes[0].hour);
@@ -108,6 +109,7 @@ void test_settings_sanitize_clamps_invalid_values() {
   TEST_ASSERT_EQUAL_UINT16(1883, s.mqttPort);
   TEST_ASSERT_EQUAL_UINT16(config::kMinMembraneFlushS, s.membraneFlushS);
   TEST_ASSERT_EQUAL_INT('\0', s.mqttServer[sizeof(s.mqttServer) - 1]);
+  TEST_ASSERT_EQUAL_UINT8(100, s.statusLedPercent);
 
   Settings valid;
   TEST_ASSERT_FALSE(config::sanitize(valid));

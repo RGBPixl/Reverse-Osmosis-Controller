@@ -23,6 +23,7 @@ constexpr const char* kKeyPressureBuild = "pBuildMaxS";
 constexpr const char* kKeyInletMaxOpen = "inMaxOpenS";
 constexpr const char* kKeyDrawThreshold = "drawLpm";
 constexpr const char* kKeyLitersPerPulse = "lPerPulse";
+constexpr const char* kKeyStatusLedPercent = "ledPct";
 
 constexpr const char* kNsMqtt = "MQTT";
 constexpr const char* kKeyMqttServer = "mqtt_server";  // alt, String
@@ -62,8 +63,10 @@ Settings loadSettings() {
     s.membraneFlushS = toU16(prefs.getInt(kKeyMembraneFlush, s.membraneFlushS));
     s.pressureBuildMaxS = toU16(prefs.getInt(kKeyPressureBuild, s.pressureBuildMaxS));
     s.inletMaxOpenS = toU16(prefs.getInt(kKeyInletMaxOpen, s.inletMaxOpenS));
-    s.drawThresholdLpm = prefs.getFloat(kKeyDrawThreshold, s.drawThresholdLpm);
-    s.litersPerPulse = prefs.getFloat(kKeyLitersPerPulse, s.litersPerPulse);
+    // getFloat() meldet einen fehlenden Schlüssel als Fehler im Log, deshalb vorher prüfen.
+    if (prefs.isKey(kKeyDrawThreshold)) s.drawThresholdLpm = prefs.getFloat(kKeyDrawThreshold, s.drawThresholdLpm);
+    if (prefs.isKey(kKeyLitersPerPulse)) s.litersPerPulse = prefs.getFloat(kKeyLitersPerPulse, s.litersPerPulse);
+    s.statusLedPercent = toU8(prefs.getInt(kKeyStatusLedPercent, s.statusLedPercent));
     prefs.end();
   }
 
@@ -103,6 +106,7 @@ bool saveSettings(const Settings& input) {
   prefs.putInt(kKeyInletMaxOpen, s.inletMaxOpenS);
   prefs.putFloat(kKeyDrawThreshold, s.drawThresholdLpm);
   prefs.putFloat(kKeyLitersPerPulse, s.litersPerPulse);
+  prefs.putInt(kKeyStatusLedPercent, s.statusLedPercent);
   prefs.end();
 
   if (!prefs.begin(kNsMqtt, false)) {

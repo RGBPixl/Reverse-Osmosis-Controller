@@ -6,6 +6,7 @@
 #include <unity.h>
 
 #include "core/status.h"
+#include "ui/brightness.h"
 #include "ui/frame.h"
 #include "ui/menu.h"
 #include "util/clock.h"
@@ -89,6 +90,18 @@ void test_frame_cuts_long_text_and_aligns_right() {
   f.printRight(1, ui::kCols, "2:15");
   TEST_ASSERT_EQUAL_STRING("            2:15", row(f, 1));
   TEST_ASSERT_EQUAL_UINT32(5, ui::lcdLength("Spül°"));
+}
+
+// ---------------------------------------------------------------------------
+// Helligkeit
+
+void test_perceived_brightness_to_duty() {
+  TEST_ASSERT_EQUAL_UINT8(0, ui::perceivedToDuty(0));
+  TEST_ASSERT_EQUAL_UINT8(1, ui::perceivedToDuty(1));  // bleibt sichtbar
+  TEST_ASSERT_EQUAL_UINT8(12, ui::perceivedToDuty(25));
+  TEST_ASSERT_EQUAL_UINT8(55, ui::perceivedToDuty(50));  // 255 * 0,5^2,2 = 55,49
+  TEST_ASSERT_EQUAL_UINT8(255, ui::perceivedToDuty(100));
+  TEST_ASSERT_EQUAL_UINT8(255, ui::perceivedToDuty(200));
 }
 
 // ---------------------------------------------------------------------------
@@ -313,6 +326,7 @@ int main(int, char**) {
   UNITY_BEGIN();
   RUN_TEST(test_frame_converts_umlauts);
   RUN_TEST(test_frame_cuts_long_text_and_aligns_right);
+  RUN_TEST(test_perceived_brightness_to_duty);
   RUN_TEST(test_days_from_civil_and_back);
   RUN_TEST(test_home_idle_shows_time_and_counter);
   RUN_TEST(test_home_wifi_icon_shows_signal_and_portal);
