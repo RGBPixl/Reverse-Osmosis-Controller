@@ -1,3 +1,5 @@
+#include <Arduino.h>
+
 // FastLED Warnung ignorieren
 #define FASTLED_INTERNAL
 #include <FastLED.h>
