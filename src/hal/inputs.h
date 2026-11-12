@@ -31,7 +31,6 @@ class Inputs {
 
   // Entprellter Druckschalter: true = Druck da.
   bool pressurized() const { return pressure_.state(); }
-  uint32_t pressureChangedAtMs() const { return pressure_.changedAtMs(); }
 
  private:
   struct ButtonState {

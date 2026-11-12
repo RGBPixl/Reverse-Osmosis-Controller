@@ -310,8 +310,8 @@ Rückfalloption. Vor dem ersten Flashen wird die aktuelle Firmware als `.bin` ge
 | 2 | Ablaufsteuerung, Spülprogramme, Zeitplan, Druckregelung, Fehlerzustand | Build + Unit-Tests | erledigt |
 | 3 | UI: Display, Menü, LEDs; alter Code entfernt | Build + Unit-Tests | erledigt |
 | 4 | Netzwerk-Task: WLAN-Reconnect, NTP, MQTT/HA, Webpanel | Build + Unit-Tests | erledigt |
-| – | Test an der Anlage mit HA | an der Anlage | offen |
-| 5 | README schreiben, Aufräumen nach dem Anlagentest | Build | offen |
+| – | Test an der Anlage mit HA | an der Anlage | erledigt (12.11.2026) |
+| 5 | README schreiben, Aufräumen, Versionen festlegen, Übernahme nach `master` | Build + Unit-Tests | erledigt |
 
 ## 5. Festgelegte Entscheidungen
 
@@ -327,4 +327,6 @@ Rückfalloption. Vor dem ersten Flashen wird die aktuelle Firmware als `.bin` ge
 | HA-Relais | nur im Service-Modus schaltbar |
 | Membranspülung per Intervall | gehört zum Kern |
 
-**Noch offen:** Die Entnahme-Schwelle in L/min wird nach dem ersten Betrieb aus den HA-Werten bestimmt.
+**Noch offen:** Die Entnahme-Schwelle in L/min wird nach dem ersten Betrieb aus den HA-Werten bestimmt
+(Sensor „Durchfluss“: typische Werte während einer Entnahme und beim Druckaufbau danach vergleichen) und im
+Webpanel eingestellt. Bis dahin greift nur das Limit „Zulauf am Stück“.

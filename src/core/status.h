@@ -73,17 +73,6 @@ struct SystemStatus {
   NetworkInfo network;
 };
 
-inline const char* modeName(Mode m) {
-  switch (m) {
-    case Mode::Idle: return "Bereit";
-    case Mode::Producing: return "Produziert";
-    case Mode::Flushing: return "Spuelt";
-    case Mode::Service: return "Service";
-    case Mode::Fault: return "Fehler";
-  }
-  return "?";
-}
-
 inline const char* faultText(FaultReason r) {
   switch (r) {
     case FaultReason::None: return "";

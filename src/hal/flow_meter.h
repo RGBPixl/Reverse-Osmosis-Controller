@@ -25,9 +25,6 @@ class FlowMeter {
   // Vor dem ersten Impuls: Zeit seit begin().
   uint32_t msSinceLastPulse(uint32_t nowMs) const { return nowMs - lastPulseMs_; }
 
-  // Rohe Impulse seit dem Start, zur Diagnose
-  uint32_t pulseCount() const { return lastPulses_; }
-
  private:
   float litersPerPulse_ = 0.0f;
   double totalLiters_ = 0.0;  // double: float wäre bei großen Summen zu ungenau
