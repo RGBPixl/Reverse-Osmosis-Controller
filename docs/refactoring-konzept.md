@@ -84,10 +84,9 @@ Das Menü läuft im selben Task wie die Steuerung und benutzt dieselben Befehle.
 
 | Zustand | Bedeutung | Ventile |
 |---|---|---|
-| `Startup` | Startspülung nach dem Booten | laut Programm |
 | `Idle` | Bereit, Druck ist da | alle zu |
 | `Producing` | Druck fehlt, Anlage produziert | Frischwasser auf |
-| `Flushing` | System- oder Membranspülung läuft | laut Programm |
+| `Flushing` | Spülprogramm läuft: Start-, System- oder Membranspülung | laut Programm |
 | `Service` | Automatik pausiert, Relais von Hand schaltbar | manuell |
 | `Fault` | Sicherheitsabschaltung, wartet auf Quittierung | alle zu |
 
@@ -97,6 +96,9 @@ Regeln:
 - Fällige Spülungen im `Service`-Modus werden nach dem Service-Modus nachgeholt.
 - `Fault` wird durch die Sicherheitslimits der Druckregelung ausgelöst (siehe unten). Später kommen der
   Overflow-Sensor und ähnliche Fehlerquellen hinzu. Quittieren geht über Menü, HA-Button oder Webpanel.
+  Fehlt nach dem Quittieren weiterhin Druck, öffnet der Zulauf sofort wieder, und die Limits laufen von vorn.
+- Den Service-Modus kann man im Fehlerzustand nicht einschalten, erst muss der Fehler quittiert sein. Auch im
+  Service-Modus gilt das Zeitlimit für den offenen Zulauf.
 
 ### Spülprogramme als Tabellen
 
