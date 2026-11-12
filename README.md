@@ -177,3 +177,7 @@ anpassen (`pio device list`). Sicherungen gehören in `backup/`, das von Git aus
 ```bash
 ~/.platformio/penv/bin/python ~/.platformio/packages/tool-esptoolpy/esptool.py --chip esp32 --port /dev/cu.usbserial-0001 --baud 460800 write_flash 0 backup/flash-backup.bin
 ```
+
+## Lizenz
+
+GNU General Public License v3.0, siehe [`LICENSE`](LICENSE).
