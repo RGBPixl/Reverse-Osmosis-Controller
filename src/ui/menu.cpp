@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 
+#include "../config/network.h"
 #include "../config/version.h"
 #include "../util/clock.h"
 
@@ -72,6 +73,15 @@ void formatLiters(double liters, char* out, size_t len) {
 
 bool alternate(uint32_t nowMs) { return (nowMs / Menu::kAlternateMs) % 2 == 1; }
 
+char wifiIcon(const core::NetworkInfo& n) {
+  if (n.portalActive) return 'P';
+  if (!n.wifiConnected) return kCharWifiOff;
+  if (n.rssi > -60) return kCharWifi3;
+  if (n.rssi > -70) return kCharWifi2;
+  if (n.rssi > -80) return kCharWifi1;
+  return kCharWifi0;
+}
+
 // ---------------------------------------------------------------------------
 // Menüeinträge
 
@@ -88,6 +98,7 @@ enum class Action : uint8_t {
   ResetCounter,
   LedTest,
   FactoryReset,
+  WifiPortal,
 };
 
 using ValueFn = void (*)(const SystemStatus& s, uint32_t nowMs, char* out, size_t len);
@@ -177,6 +188,35 @@ void valueFactoryReset(const SystemStatus&, uint32_t, char* out, size_t len) { s
 void valueVersion(const SystemStatus&, uint32_t, char* out, size_t len) {
   snprintf(out, len, "%s", config::kFirmwareVersion);
 }
+void valueWifi(const SystemStatus& s, uint32_t, char* out, size_t len) {
+  if (s.network.portalActive) {
+    snprintf(out, len, "Portal: %s", config::kSetupApName);
+  } else if (s.network.wifiConnected) {
+    snprintf(out, len, "%s", s.network.ssid);
+  } else {
+    snprintf(out, len, "nicht verbunden");
+  }
+}
+void valueIp(const SystemStatus& s, uint32_t, char* out, size_t len) {
+  snprintf(out, len, "%s", s.network.wifiConnected ? s.network.ip : (s.network.portalActive ? "192.168.4.1" : "-"));
+}
+void valueRssi(const SystemStatus& s, uint32_t, char* out, size_t len) {
+  if (s.network.wifiConnected) {
+    snprintf(out, len, "%d dBm", static_cast<int>(s.network.rssi));
+  } else {
+    snprintf(out, len, "-");
+  }
+}
+void valueMqtt(const SystemStatus& s, uint32_t, char* out, size_t len) {
+  if (!s.network.mqttConfigured) {
+    snprintf(out, len, "kein Server");
+  } else {
+    snprintf(out, len, "%s", s.network.mqttConnected ? "verbunden" : "getrennt");
+  }
+}
+void valuePortal(const SystemStatus& s, uint32_t, char* out, size_t len) {
+  snprintf(out, len, "%s", s.network.portalActive ? "läuft" : "OK = Starten");
+}
 
 bool whenFlushing(const SystemStatus& s) { return s.controller.mode == Mode::Flushing; }
 bool whenFault(const SystemStatus& s) { return s.controller.mode == Mode::Fault; }
@@ -206,6 +246,14 @@ const Item kActionItems[] = {
     {"Ventil Bypass", valueBypass, Action::ToggleBypass, false, whenService},
 };
 
+const Item kNetworkItems[] = {
+    {"WLAN", valueWifi, Action::None, false, nullptr},
+    {"IP-Adresse", valueIp, Action::None, false, nullptr},
+    {"Signal", valueRssi, Action::None, false, nullptr},
+    {"MQTT", valueMqtt, Action::None, false, nullptr},
+    {"WLAN einrichten", valuePortal, Action::WifiPortal, false, nullptr},
+};
+
 const Item kSystemItems[] = {
     {"Zähler löschen", valueResetCounter, Action::ResetCounter, true, nullptr},
     {"LED-Test", valueStart, Action::LedTest, false, nullptr},
@@ -223,6 +271,7 @@ constexpr uint8_t kActionsCategory = 1;
 const Category kCategories[] = {
     {"Status", kStatusItems, countOf(kStatusItems)},
     {"Aktionen", kActionItems, countOf(kActionItems)},
+    {"Netzwerk", kNetworkItems, countOf(kNetworkItems)},
     {"System", kSystemItems, countOf(kSystemItems)},
 };
 constexpr uint8_t kCategoryCount = countOf(kCategories);
@@ -372,6 +421,10 @@ void Menu::activateItem(const SystemStatus& status, uint32_t nowMs) {
       host_.factoryReset();
       done = "Zurückgesetzt";
       break;
+    case Action::WifiPortal:
+      host_.startWifiPortal();
+      done = "WLAN: RO-Setup";
+      break;
   }
   showMessage(ok ? done : "Nicht möglich", nowMs);
 }
@@ -416,6 +469,7 @@ void Menu::renderHome(const SystemStatus& status, uint32_t nowMs, Frame& frame) 
     snprintf(text, sizeof(text), "%02u:%02u", status.clock.minuteOfDay / 60u, status.clock.minuteOfDay % 60u);
     frame.print(0, 10, text);
   }
+  frame.put(0, kCols - 1, wifiIcon(status.network));
 
   // Warnungen wechseln sich in Zeile 2 mit der normalen Anzeige ab.
   const bool showWarning = c.warnings != 0 && (c.mode == Mode::Idle || c.mode == Mode::Producing) && alternate(nowMs);

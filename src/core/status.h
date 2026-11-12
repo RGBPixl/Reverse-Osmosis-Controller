@@ -54,11 +54,23 @@ struct Measurements {
   bool pressurized = false;  // entprellter Druckschalter
 };
 
-// Alles, was Display, LEDs und (ab Phase 4) MQTT und Webpanel anzeigen.
+// Zustand von WLAN und MQTT, geliefert vom Netzwerk-Task
+struct NetworkInfo {
+  bool wifiConnected = false;
+  bool portalActive = false;  // Einrichtungsportal offen
+  int8_t rssi = 0;            // Signalstärke in dBm
+  char ip[16] = "";
+  char ssid[33] = "";
+  bool mqttConfigured = false;
+  bool mqttConnected = false;
+};
+
+// Alles, was Display, LEDs, MQTT und Webpanel anzeigen.
 struct SystemStatus {
   ControllerStatus controller;
   Measurements measurements;
   WallClock clock;
+  NetworkInfo network;
 };
 
 inline const char* modeName(Mode m) {

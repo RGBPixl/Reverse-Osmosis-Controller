@@ -222,20 +222,32 @@ nicht verloren gehen.
 | Relais Frischwasser / Abwasser / Membran-Bypass | bleiben als Schalter; Befehle werden nur im Service-Modus angenommen, sonst springt der Schalter zurück |
 | **neu:** Service-Modus | Schalter |
 | **neu:** Membran-Spülintervall | Zahl (Stunden) |
-| **neu:** Systemspülung / Membranspülung starten, Fehler quittieren | Buttons |
-| **neu:** Zustand | Sensor (Bereit / Produziert / Spült / Service / Fehler) |
-| **neu:** Fehler | binary_sensor `problem` + Text mit Ursache bzw. Warnung |
+| **neu:** Systemspülung / Membranspülung starten, Spülung abbrechen, Fehler quittieren | Buttons |
+| **neu:** Zustand | Sensor (Bereit / Produziert / Spült: … / Service / Fehler) |
+| **neu:** Problem + Meldung | binary_sensor `problem` + Text mit Ursache bzw. Warnung |
 | **neu:** Durchfluss | Sensor in L/min (Zulauf) |
+| **neu:** Druck | binary_sensor, Zustand des Druckschalters |
+| **neu:** WLAN-Signal | Diagnose-Sensor in dBm |
 | Schwimmer, Container, Reserve 1/2 | werden aus HA entfernt (leere Discovery-Nachricht), siehe spätere Features |
 
-Der MQTT-Reconnect blockiert die Steuerung nicht mehr, und nach jedem Reconnect werden Discovery und Zustände erneut
-gesendet.
+Alle Entitäten haben ein Verfügbarkeits-Topic (`reverse_osmosis/status`), HA zeigt sie also als „nicht verfügbar“,
+wenn die Anlage offline ist. Der MQTT-Reconnect blockiert die Steuerung nicht mehr, und nach jedem Reconnect werden
+Discovery und Zustände erneut gesendet. Die alte Firmware ließ Relais-Befehle gespeichert („retain“) senden. Solche
+Reste löscht die neue Firmware beim Verbinden vom Broker.
+
+Spülzeiten werden als `HH:MM` gesetzt, `--:--` (oder leer) schaltet eine Spülzeit aus.
 
 ### Webpanel
 
-- Startseite mit Status: Zustand, Messwerte, Verbindung.
-- Einstellungen: MQTT, Spülzeiten, Intervalle, Spüldauern, Sicherheitslimits, Entnahme-Schwelle, Durchflussfaktor.
+- `/`: Status (Zustand, Messwerte, Ventile, Verbindung) und Aktionen.
+- `/settings`: MQTT, Spülzeiten, Intervalle, Spüldauern, Sicherheitslimits, Entnahme-Schwelle, Durchflussfaktor.
+- `/api/status`: Status als JSON. `/mqtt` (alte Adresse) leitet auf `/settings` um.
 - Änderungen gelten sofort. Ein Neustart nach dem Speichern ist nicht mehr nötig.
+
+### WLAN-Einrichtung
+
+Das Einrichtungsportal heißt jetzt `RO-Setup` (bisher `Reverse-Osmosis-Controller_AP`), damit der Name aufs LCD
+passt. Es ist ein offenes WLAN, die Seite liegt unter `http://192.168.4.1`, und es schließt nach 5 min von selbst.
 
 ### Einstellungen
 
@@ -248,43 +260,55 @@ gesendet.
 
 ```
 src/
-  main.cpp                 nur setup()/loop(): Module verbinden
+  main.cpp                 nur setup()/loop() der App
+  app/app.*                verbindet alles, Takt 10 ms im Arduino-loop
+  app/shared.h             gemeinsame Daten zwischen Steuerungs- und Netzwerk-Task
   config/pins.h            alle Pins an einer Stelle (auch reservierte)
-  config/settings.*        Einstellungen, Standardwerte, NVS
+  config/settings.*        Einstellungen mit Standardwerten und Bereichsprüfung
+  config/settings_store.*  Laden und Speichern im NVS
+  config/network.h         Hostname, Portal-Name, NTP-Server, MQTT-Client-ID
+  config/version.h         Firmware-Version
   hal/relays.*             Ventile schalten + Logging
   hal/inputs.*             Taster und Druckschalter, entprellt
   hal/flow_meter.*         Impulszähler, Liter, L/min
   hal/temperature.*        DS18B20, nicht blockierend
   core/controller.*        Zustandsmaschine, einziger Relais-Schalter
-  core/programs.h          Spülprogramme als Tabellen
+  core/programs.*          Spülprogramme als Tabellen
   core/scheduler.*         feste Spülzeiten und Intervalle
   core/commands.h          Befehle an die Steuerung
   core/status.h            Status-Snapshot
-  net/network_task.*       WLAN, Reconnect, Portal, NTP
+  core/io.h                Ein- und Ausgaben pro tick()
+  net/network.*            Netzwerk-Task: WLAN, Reconnect, Portal, NTP
   net/mqtt.*               MQTT + HA-Discovery
+  net/protocol.*           Nutzlasten auswerten, Texte für HA
   net/web.*                Webpanel
+  ui/frame.*               Bildschirmpuffer mit Umlaut-Umsetzung
+  ui/menu.*                Startseite und Menü
   ui/display.*             LCD (einziger Schreiber)
-  ui/menu.*                Menübaum
   ui/leds.*                LED-Ring + RGB-Status-LED
+  util/                    Logging, Entprellung, Uhrzeit und Datum
 test/
-  test_controller/         Unit-Tests der Ablaufsteuerung (laufen auf dem Mac)
+  test_core/               Einstellungen, Zeitplan, Ablaufsteuerung
+  test_ui/                 Menü, Startseite, LCD-Zeichensatz, Datum
+  test_net/                MQTT-Nutzlasten und HA-Texte
 ```
 
-`core/` hängt nicht von Arduino ab. Die Steuerung bekommt Zeit und Eingänge übergeben und liefert die gewünschten
-Ventilzustände zurück. Dafür bekommt `platformio.ini` eine zusätzliche Umgebung `native` für die Tests.
+`core/`, `ui/menu`, `ui/frame` und `net/protocol` hängen nicht von Arduino ab und werden mit `pio test -e native` auf
+dem Mac getestet.
 
 ## 4. Vorgehen
 
 Weil die Anlage in Betrieb ist, läuft das Refactoring auf einem eigenen Branch. `master` bleibt als lauffähige
 Rückfalloption. Vor dem ersten Flashen wird die aktuelle Firmware als `.bin` gesichert.
 
-| Phase | Inhalt | Prüfung |
-|---|---|---|
-| 1 | Grundgerüst: `pins.h`, Einstellungen, HAL (Relais, Eingänge, Durchfluss, Temperatur) | Build |
-| 2 | Ablaufsteuerung, Spülprogramme, Zeitplan, Druckregelung, Fehlerzustand | Build + Unit-Tests |
-| 3 | UI: Display, Menü, LEDs. Danach ist die Anlage offline voll bedienbar | Build, erster Test an der Anlage |
-| 4 | Netzwerk-Task: WLAN-Reconnect, NTP, MQTT/HA, Webpanel | Build, Test an der Anlage mit HA |
-| 5 | Alten Code entfernen, README schreiben | Build |
+| Phase | Inhalt | Prüfung | Stand |
+|---|---|---|---|
+| 1 | Grundgerüst: `pins.h`, Einstellungen, HAL (Relais, Eingänge, Durchfluss, Temperatur) | Build | erledigt |
+| 2 | Ablaufsteuerung, Spülprogramme, Zeitplan, Druckregelung, Fehlerzustand | Build + Unit-Tests | erledigt |
+| 3 | UI: Display, Menü, LEDs; alter Code entfernt | Build + Unit-Tests | erledigt |
+| 4 | Netzwerk-Task: WLAN-Reconnect, NTP, MQTT/HA, Webpanel | Build + Unit-Tests | erledigt |
+| – | Test an der Anlage mit HA | an der Anlage | offen |
+| 5 | README schreiben, Aufräumen nach dem Anlagentest | Build | offen |
 
 ## 5. Festgelegte Entscheidungen
 

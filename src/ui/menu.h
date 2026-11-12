@@ -28,6 +28,7 @@ class MenuHost {
   virtual void resetWaterCounter() = 0;
   virtual void factoryReset() = 0;
   virtual void startLedTest() = 0;
+  virtual void startWifiPortal() = 0;
 };
 
 class Menu {

@@ -44,7 +44,17 @@ void App::setup() {
 
   lastSavedLiters_ = totalLiters;
   lastSaveMs_ = lastTickMs_ = lastDisplayMs_ = lastLedMs_ = now;
+
+  // Gemeinsame Daten anlegen, dann den Netzwerk-Task starten.
+  settingsHub_.begin(settings_);
+  settingsVersion_ = settingsHub_.version();
+  sharedStatus_.begin();
+  networkInfo_.begin();
+  requests_.begin();
   updateStatus();
+  sharedStatus_.set(status_);
+  network_.start();
+
   util::logf("App", "Bereit");
 }
 
@@ -62,7 +72,7 @@ void App::loop() {
   }
   if (now - lastLedMs_ >= kLedMs) {
     lastLedMs_ = now;
-    leds_.update(status_, ui::NetworkState::Offline, now);  // Netzwerk folgt in Phase 4
+    leds_.update(status_, networkState(), now);
   }
 
   delay(1);  // anderen Tasks Zeit geben
@@ -72,6 +82,8 @@ void App::tick(uint32_t nowMs) {
   inputs_.update(nowMs);
   flow_.update(nowMs);
   temperature_.update(nowMs);
+  handleSettingsChanges(nowMs);
+  handleRequests();
 
   input_.nowMs = nowMs;
   input_.clock = readClock();
@@ -84,7 +96,41 @@ void App::tick(uint32_t nowMs) {
   persist(out, nowMs);
 
   updateStatus();
+  sharedStatus_.set(status_);
   handleButtons(nowMs);
+}
+
+void App::handleRequests() {
+  Request request;
+  while (requests_.pop(request)) {
+    switch (request.type) {
+      case RequestType::Controller: controller_.handle(request.command); break;
+      case RequestType::ResetCounter: resetWaterCounter(); break;
+    }
+  }
+}
+
+void App::handleSettingsChanges(uint32_t nowMs) {
+  uint32_t version = 0;
+  if (settingsHub_.version() != settingsVersion_) {
+    settings_ = settingsHub_.get(&version);
+    settingsVersion_ = version;
+    controller_.setSettings(settings_);
+    flow_.setLitersPerPulse(settings_.litersPerPulse);
+    settingsDirty_ = true;
+    settingsChangedMs_ = nowMs;
+  }
+  if (settingsDirty_ && nowMs - settingsChangedMs_ >= kSettingsSaveDelayMs) {
+    settingsDirty_ = !config::saveSettings(settings_);
+  }
+}
+
+ui::NetworkState App::networkState() const {
+  const core::NetworkInfo& n = status_.network;
+  if (n.portalActive) return ui::NetworkState::Portal;
+  if (!n.wifiConnected) return ui::NetworkState::Offline;
+  if (n.mqttConfigured && !n.mqttConnected) return ui::NetworkState::WifiOnly;
+  return ui::NetworkState::Online;
 }
 
 void App::handleButtons(uint32_t nowMs) {
@@ -135,6 +181,7 @@ void App::saveCounter(uint32_t nowMs) {
 void App::updateStatus() {
   status_.controller = controller_.status();
   status_.clock = input_.clock;
+  status_.network = networkInfo_.get();
 
   core::Measurements& m = status_.measurements;
   for (uint8_t i = 0; i < 2; ++i) {
@@ -175,12 +222,13 @@ void App::resetWaterCounter() {
 
 void App::factoryReset() {
   config::eraseSettings();
-  settings_ = config::loadSettings();
-  controller_.setSettings(settings_);
-  flow_.setLitersPerPulse(settings_.litersPerPulse);
+  // Über den Hub, damit auch der Netzwerk-Task (MQTT-Zugang) die Standardwerte bekommt.
+  settingsHub_.modify([](config::Settings& s) { s = config::Settings(); });
   util::logf("App", "Werksreset: Standardeinstellungen aktiv");
 }
 
 void App::startLedTest() { leds_.startTest(millis()); }
+
+void App::startWifiPortal() { network_.requestPortal(); }
 
 }  // namespace app

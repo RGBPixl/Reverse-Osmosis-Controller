@@ -1,6 +1,7 @@
 // Unit-Tests für Menü, Startseite, LCD-Zeichensatz und Datumsrechnung.
 // Laufen auf dem Mac: pio test -e native
 
+#include <stdio.h>
 #include <string.h>
 #include <unity.h>
 
@@ -24,6 +25,7 @@ struct FakeHost : ui::MenuHost {
   int counterResets = 0;
   int factoryResets = 0;
   int ledTests = 0;
+  int portals = 0;
 
   bool sendCommand(const Command& command) override {
     ++commands;
@@ -33,6 +35,7 @@ struct FakeHost : ui::MenuHost {
   void resetWaterCounter() override { ++counterResets; }
   void factoryReset() override { ++factoryResets; }
   void startLedTest() override { ++ledTests; }
+  void startWifiPortal() override { ++portals; }
 };
 
 // Zeile ohne Leerzeichen am Ende
@@ -114,8 +117,23 @@ void test_home_idle_shows_time_and_counter() {
   sim.status.clock.valid = true;
   sim.status.clock.minuteOfDay = 14 * 60 + 3;
   sim.draw();
-  TEST_ASSERT_EQUAL_STRING("Bereit    14:03", row(sim.frame, 0));
+  // Spalte 15: WLAN-Symbol, hier "kein WLAN" (Code 5)
+  TEST_ASSERT_EQUAL_STRING("Bereit    14:03\x05", row(sim.frame, 0));
   TEST_ASSERT_EQUAL_STRING("Zulauf 1234.6 L", row(sim.frame, 1));
+}
+
+void test_home_wifi_icon_shows_signal_and_portal() {
+  MenuSim sim;
+  sim.status.network.wifiConnected = true;
+  sim.status.network.rssi = -65;
+  sim.draw();
+  TEST_ASSERT_EQUAL_INT(ui::kCharWifi2, sim.frame.cells[0][15]);
+  sim.status.network.rssi = -50;
+  sim.draw();
+  TEST_ASSERT_EQUAL_INT(ui::kCharWifi3, sim.frame.cells[0][15]);
+  sim.status.network.portalActive = true;
+  sim.draw();
+  TEST_ASSERT_EQUAL_INT('P', sim.frame.cells[0][15]);
 }
 
 void test_home_flushing_shows_program_and_remaining_time() {
@@ -127,7 +145,7 @@ void test_home_flushing_shows_program_and_remaining_time() {
   c.stepCount = 4;
   c.programRemainingMs = 135000;
   sim.draw();
-  TEST_ASSERT_EQUAL_STRING("Sp\xF5lung", row(sim.frame, 0));
+  TEST_ASSERT_EQUAL_STRING("Sp\xF5lung        \x05", row(sim.frame, 0));
   TEST_ASSERT_EQUAL_STRING("System 2/4  2:15", row(sim.frame, 1));
 }
 
@@ -183,9 +201,39 @@ void test_rejected_command_shows_message() {
   TEST_ASSERT_EQUAL_STRING("Nicht m\xEFglich", row(sim.frame, 1));
 }
 
+void test_network_category() {
+  MenuSim sim;
+  sim.press(Key::Ok);
+  sim.press(Key::Right);
+  sim.press(Key::Right);
+  TEST_ASSERT_EQUAL_STRING(">Netzwerk", row(sim.frame, 0));
+  sim.press(Key::Ok);
+  TEST_ASSERT_EQUAL_STRING("WLAN", row(sim.frame, 0));
+  TEST_ASSERT_EQUAL_STRING("nicht verbunden", row(sim.frame, 1));
+
+  sim.status.network.wifiConnected = true;
+  snprintf(sim.status.network.ssid, sizeof(sim.status.network.ssid), "Zuhause");
+  snprintf(sim.status.network.ip, sizeof(sim.status.network.ip), "192.168.1.50");
+  sim.draw();
+  TEST_ASSERT_EQUAL_STRING("Zuhause", row(sim.frame, 1));
+  sim.press(Key::Right);
+  TEST_ASSERT_EQUAL_STRING("192.168.1.50", row(sim.frame, 1));
+  sim.press(Key::Right);
+  sim.press(Key::Right);
+  TEST_ASSERT_EQUAL_STRING("MQTT", row(sim.frame, 0));
+  TEST_ASSERT_EQUAL_STRING("kein Server", row(sim.frame, 1));
+
+  sim.press(Key::Right);
+  TEST_ASSERT_EQUAL_STRING("WLAN einrichten", row(sim.frame, 0));
+  sim.press(Key::Ok);
+  TEST_ASSERT_EQUAL_INT(1, sim.host.portals);
+  TEST_ASSERT_EQUAL_STRING("WLAN: RO-Setup", row(sim.frame, 1));
+}
+
 void test_counter_reset_needs_confirmation() {
   MenuSim sim;
   sim.press(Key::Ok);
+  sim.press(Key::Right);
   sim.press(Key::Right);
   sim.press(Key::Right);
   sim.press(Key::Ok);  // System
@@ -234,7 +282,7 @@ void test_fault_shortcut_from_home() {
   sim.status.controller.fault = FaultReason::InletOpenTooLong;
   sim.now = 0;
   sim.draw();
-  TEST_ASSERT_EQUAL_STRING("FEHLER", row(sim.frame, 0));
+  TEST_ASSERT_EQUAL_STRING("FEHLER         \x05", row(sim.frame, 0));
   TEST_ASSERT_EQUAL_STRING("Zulauf zu lange", row(sim.frame, 1));
 
   sim.press(Key::Ok);
@@ -267,11 +315,13 @@ int main(int, char**) {
   RUN_TEST(test_frame_cuts_long_text_and_aligns_right);
   RUN_TEST(test_days_from_civil_and_back);
   RUN_TEST(test_home_idle_shows_time_and_counter);
+  RUN_TEST(test_home_wifi_icon_shows_signal_and_portal);
   RUN_TEST(test_home_flushing_shows_program_and_remaining_time);
   RUN_TEST(test_home_warning_alternates_with_counter);
   RUN_TEST(test_menu_navigation_between_categories);
   RUN_TEST(test_start_system_flush_from_menu);
   RUN_TEST(test_rejected_command_shows_message);
+  RUN_TEST(test_network_category);
   RUN_TEST(test_counter_reset_needs_confirmation);
   RUN_TEST(test_valve_items_only_in_service_mode);
   RUN_TEST(test_fault_shortcut_from_home);
